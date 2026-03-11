@@ -189,7 +189,7 @@ local auraRange = 50
 local auraSpeed = 20
 local auraSwitchDelay = 0
 local auraTargetType = "Mobs"
-local auraKey = Enum.KeyCode.T
+local auraKey = Enum.KeyCode.Y
 local auraCircleEnabled = false
 local spoofWeaponEnabled = false
 local spoofWeaponType = "Melee"
@@ -226,23 +226,31 @@ local bodyParts = {
     "RightUpperLeg", "RightLowerLeg", "RightFoot"
 }
 
+local partCache = setmetatable({}, {__mode = "v"})
+
 local function getTargetPart(model)
-    local available = {}
-    for _, name in ipairs(bodyParts) do
-        local part = model:FindFirstChild(name)
-        if part then table.insert(available, part) end
+    if partCache[model] and partCache[model].Parent then
+        return partCache[model]
     end
-    if #available == 0 then return model:FindFirstChildOfClass("BasePart") end
-    return available[math.random(1, #available)]
+    
+    for _, part in ipairs(model:GetChildren()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            partCache[model] = part
+            return part
+        end
+    end
+    
+    local fallback = model:FindFirstChildOfClass("BasePart")
+    partCache[model] = fallback
+    return fallback
 end
 
 local function fireHit(targetModel)
     local targetPart = getTargetPart(targetModel)
-    if not targetPart then return end
-    pcall(function()
+    if targetPart then
         NetModule:RemoteEvent("RegisterAttack"):FireServer(0)
         NetModule:RemoteEvent("RegisterHit"):FireServer(targetPart, {})
-    end)
+    end
 end
 
 local function getSWeapon()
@@ -256,83 +264,127 @@ local function getSWeapon()
     return nil
 end
 
-local killAuraToggle = combat:NewToggle("Kill Aura", false, function(v)
+killAuraToggle = combat:NewToggle("Kill Aura", false, function(v)
     killAuraEnabled = v
     if v then
         Notif:Notify("Enabled Kill Aura", 5, "success")
         task.spawn(function()
+            local enemiesFolder = workspace:FindFirstChild("Enemies")
+            local charactersFolder = workspace:FindFirstChild("Characters")
+            local lastTargetScan = 0
+            local cachedTargets = {}
+            
             while killAuraEnabled do
+                local startTime = os.clock()
                 local delayTime = math.max(auraSwitchDelay, 1 / math.max(auraSpeed, 1))
-
-                pcall(function()
-                    local char = plr.Character
-                    if not char then return end
+                
+                local char = plr.Character
+                if char then
                     local hum = char:FindFirstChild("Humanoid")
-                    if not hum or hum.Health <= 0 then return end
-
-                    if instaKillMode then
-                        for _, target in pairs(workspace.Enemies:GetChildren()) do
-                            pcall(function()
-                                local targetHum = target:FindFirstChildOfClass("Humanoid")
-                                if targetHum and targetHum.Health > 0 then
-                                    local distance = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and 
-                                        (plr.Character.HumanoidRootPart.Position - (target:FindFirstChild("HumanoidRootPart") and target.HumanoidRootPart.Position or target:GetPivot().Position)).Magnitude or 0
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    
+                    if hum and hum.Health > 0 and hrp then
+                        if instaKillMode then
+                            if startTime - lastTargetScan > 0.1 then
+                                if enemiesFolder then
+                                    for _, target in ipairs(enemiesFolder:GetChildren()) do
+                                        local targetHum = target:FindFirstChildOfClass("Humanoid")
+                                        if targetHum and targetHum.Health > 0 then
+                                            local targetHrp = target:FindFirstChild("HumanoidRootPart")
+                                            if targetHrp and (hrp.Position - targetHrp.Position).Magnitude < 1000 then
+                                                targetHum.Health = 0
+                                            end
+                                        end
+                                    end
+                                end
+                                lastTargetScan = startTime
+                            end
+                        else
+                            local currentTool = char:FindFirstChildOfClass("Tool")
+                            local canAttack = (currentTool and currentTool.ToolTip ~= "Gun") or spoofWeaponEnabled
+                            
+                            if canAttack then
+                                if startTime - lastTargetScan > 0.3 then
+                                    cachedTargets = {}
                                     
-                                    if distance < 1000 then
-                                        targetHum.Health = 0
-                                        targetHum.MaxHealth = 0
+                                    if auraTargetType == "Mobs" and enemiesFolder then
+                                        for _, target in ipairs(enemiesFolder:GetChildren()) do
+                                            local targetHrp = target:FindFirstChild("HumanoidRootPart")
+                                            local targetHum = target:FindFirstChild("Humanoid")
+                                            if targetHrp and targetHum and targetHum.Health > 0 then
+                                                if (hrp.Position - targetHrp.Position).Magnitude < auraRange then
+                                                    table.insert(cachedTargets, target)
+                                                end
+                                            end
+                                        end
+                                    elseif auraTargetType == "Players" and charactersFolder then
+                                        for _, target in ipairs(charactersFolder:GetChildren()) do
+                                            if target ~= char then
+                                                local targetHrp = target:FindFirstChild("HumanoidRootPart")
+                                                local targetHum = target:FindFirstChild("Humanoid")
+                                                if targetHrp and targetHum and targetHum.Health > 0 then
+                                                    if (hrp.Position - targetHrp.Position).Magnitude < auraRange then
+                                                        table.insert(cachedTargets, target)
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    elseif auraTargetType == "Both" then
+                                        if enemiesFolder then
+                                            for _, target in ipairs(enemiesFolder:GetChildren()) do
+                                                local targetHrp = target:FindFirstChild("HumanoidRootPart")
+                                                local targetHum = target:FindFirstChild("Humanoid")
+                                                if targetHrp and targetHum and targetHum.Health > 0 then
+                                                    if (hrp.Position - targetHrp.Position).Magnitude < auraRange then
+                                                        table.insert(cachedTargets, target)
+                                                    end
+                                                end
+                                            end
+                                        end
+                                        if charactersFolder then
+                                            for _, target in ipairs(charactersFolder:GetChildren()) do
+                                                if target ~= char then
+                                                    local targetHrp = target:FindFirstChild("HumanoidRootPart")
+                                                    local targetHum = target:FindFirstChild("Humanoid")
+                                                    if targetHrp and targetHum and targetHum.Health > 0 then
+                                                        if (hrp.Position - targetHrp.Position).Magnitude < auraRange then
+                                                            table.insert(cachedTargets, target)
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
                                     end
+                                    
+                                    lastTargetScan = startTime
                                 end
-                            end)
-                        end
-                        return
-                    end
-
-                    local tool = char:FindFirstChildOfClass("Tool")
-                    local canAttack = (tool and tool.ToolTip ~= "Gun") or spoofWeaponEnabled
-
-                    if canAttack then
-                        local allTargets = {}
-                        local targetFolders = auraTargetType == "Players" and {workspace.Characters}
-                            or auraTargetType == "Mobs" and {workspace.Enemies}
-                            or {workspace.Enemies, workspace.Characters}
-
-                        for _, folder in pairs(targetFolders) do
-                            for _, target in pairs(folder:GetChildren()) do
-                                local targetHRP = target:FindFirstChild("HumanoidRootPart")
-                                local targetHum = target:FindFirstChild("Humanoid")
-                                if targetHRP and targetHum and targetHum.Health > 0 and target ~= char then
-                                    if plr:DistanceFromCharacter(targetHRP.Position) < auraRange then
-                                        table.insert(allTargets, {target, targetHRP})
+                                
+                                if #cachedTargets > 0 then
+                                    if currentTargetIndex > #cachedTargets then 
+                                        currentTargetIndex = 1 
                                     end
+                                    
+                                    local target = cachedTargets[currentTargetIndex]
+                                    
+                                    if spoofWeaponEnabled then
+                                        local spoofTool = plr:FindFirstChild("Backpack") and 
+                                                         plr.Backpack:FindFirstChildOfClass("Tool")
+                                        if spoofTool and spoofTool:GetAttribute("WeaponType") == spoofWeaponType then
+                                            fireHit(target)
+                                        else
+                                            fireHit(target)
+                                        end
+                                    elseif currentTool then
+                                        fireHit(target)
+                                    end
+                                    
+                                    currentTargetIndex = currentTargetIndex + 1
                                 end
                             end
                         end
-
-                        if #allTargets > 0 then
-                            if currentTargetIndex > #allTargets then currentTargetIndex = 1 end
-                            local t = allTargets[currentTargetIndex]
-
-                            if spoofWeaponEnabled then
-                                local spoofTool = getSWeapon()
-                                if spoofTool then
-                                    hum:EquipTool(spoofTool)
-                                    fireHit(t[1])
-                                    if tool then hum:EquipTool(tool) else hum:UnequipTools() end
-                                else
-                                    fireHit(t[1])
-                                end
-                            else
-                                if tool then
-                                    fireHit(t[1])
-                                end
-                            end
-
-                            currentTargetIndex = currentTargetIndex + 1
-                        end
                     end
-                end)
-
+                end
+                
                 task.wait(delayTime)
             end
         end)
@@ -961,7 +1013,7 @@ end)
 local sethiddenproperty = sethiddenproperty or function(...) return ... end
 
 task.spawn(function()
-    while task.wait() do
+    while task.wait(0.2) do
         if bringMobsEnabled and character and character:FindFirstChild("HumanoidRootPart") then
             pcall(sethiddenproperty, game.Players.LocalPlayer, "SimulationRadius", math.huge)
 
@@ -1862,18 +1914,38 @@ getServers = function(placeId)
 
     repeat
         local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"..cursor
-        local res = request({Url = url, Method = "GET"})
-        local data = HttpService:JSONDecode(res.Body)
+        local success, res = pcall(function()
+            return request({Url = url, Method = "GET"})
+        end)
 
-        for _, server in ipairs(data.data) do
-            if server.playing < server.maxPlayers and server.id ~= game.JobId then
-                table.insert(servers, server)
+        if success and res and res.Body then
+            local successDecode, data = pcall(function()
+                return HttpService:JSONDecode(res.Body)
+            end)
+
+            if successDecode and data and data.data then
+                for _, server in ipairs(data.data) do
+                    if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                        table.insert(servers, server)
+                    end
+                end
+
+                cursor = data.nextPageCursor and ("&cursor=" .. data.nextPageCursor) or nil
+            else
+                warn("Failed to decode server data or invalid response structure.")
+                break
             end
+        else
+            warn("Failed to fetch server data from URL: " .. url)
+            break
         end
 
-        cursor = data.nextPageCursor and ("&cursor=" .. data.nextPageCursor) or nil
         task.wait()
     until not cursor
+
+    if #servers == 0 then
+        warn("No servers found for placeId: " .. placeId)
+    end
 
     return servers
 end
