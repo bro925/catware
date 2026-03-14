@@ -253,6 +253,34 @@ local function fireHit(targetModel)
     end
 end
 
+local function isUsingTRexFruit()
+    local data = plr:FindFirstChild("Data")
+    if not data then return false end
+    for _, obj in ipairs(data:GetChildren()) do
+        if obj:IsA("StringValue") and obj.Value == "T-Rex-T-Rex" then
+            return true
+        end
+    end
+    return false
+end
+
+local function fireTRexAttack(targetHrp)
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if not hrp or not targetHrp then return end
+
+    local direction = (targetHrp.Position - hrp.Position).Unit
+    local tRexFolder = character:FindFirstChild("T-Rex-T-Rex")
+    if not tRexFolder then return end
+    local remote = tRexFolder:FindFirstChild("LeftClickRemote")
+    if not remote then return end
+
+    local args = {
+        vector.create(direction.X, direction.Y, direction.Z),
+        1
+    }
+    remote:FireServer(table.unpack(args))
+end
+
 local function getSWeapon()
     local backpack = plr:FindFirstChild("Backpack")
     if not backpack then return nil end
@@ -301,7 +329,14 @@ killAuraToggle = combat:NewToggle("Kill Aura", false, function(v)
                             end
                         else
                             local currentTool = char:FindFirstChildOfClass("Tool")
+                            local usingTRex = isUsingTRexFruit()
+
                             local canAttack = (currentTool and currentTool.ToolTip ~= "Gun") or spoofWeaponEnabled
+                            local usingDemonFruit = spoofWeaponEnabled and spoofWeaponType == "Demon Fruit"
+
+                            if usingDemonFruit and usingTRex then
+                                canAttack = true
+                            end
                             
                             if canAttack then
                                 if startTime - lastTargetScan > 0.3 then
@@ -365,15 +400,12 @@ killAuraToggle = combat:NewToggle("Kill Aura", false, function(v)
                                     end
                                     
                                     local target = cachedTargets[currentTargetIndex]
-                                    
-                                    if spoofWeaponEnabled then
-                                        local spoofTool = plr:FindFirstChild("Backpack") and 
-                                                         plr.Backpack:FindFirstChildOfClass("Tool")
-                                        if spoofTool and spoofTool:GetAttribute("WeaponType") == spoofWeaponType then
-                                            fireHit(target)
-                                        else
-                                            fireHit(target)
-                                        end
+                                    local targetHrp = target:FindFirstChild("HumanoidRootPart")
+
+                                    if usingDemonFruit and usingTRex and targetHrp then
+                                        fireTRexAttack(targetHrp)
+                                    elseif spoofWeaponEnabled then
+                                        fireHit(target)
                                     elseif currentTool then
                                         fireHit(target)
                                     end
