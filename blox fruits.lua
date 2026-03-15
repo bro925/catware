@@ -1,26 +1,29 @@
-local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bro925/test/refs/heads/main/bro.lua"))()
+local repo = 'https://raw.githubusercontent.com/bro925/LinoriaLib/main/'
 
-local Wm = library:Watermark("catware | rank: " .. library.rank)
-local FpsWm = Wm:AddWatermark("fps: " .. library.fps)
-coroutine.wrap(function()
-    while wait(1) do
-        FpsWm:Text("fps: " .. library.fps)
-    end
-end)()
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
-local Notif = library:InitNotifications()
-library.title = "catware - Blox Fruits | Build 030126"
+local Window = Library:CreateWindow({
+    Title = 'catware - Blox Fruits',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 0
+})
 
-coroutine.wrap(function()
-    library:Introduction()
-end)()
+local Tabs = {
+    Combat = Window:AddTab('Combat'),
+    Farming = Window:AddTab('Farming'),
+    Movement = Window:AddTab('Movement'),
+    Player = Window:AddTab('Player'),
+    Misc = Window:AddTab('Misc'),
+    Teleport = Window:AddTab('Teleport'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
 
-wait(1)
-local Init = library:Init()
+-- // ============================================================== Variables ============================================================== \\ --
 
--- // ============================================================== variables n other shit ============================================================== \\ --
 local charFolder = workspace:FindFirstChild("Characters")
-
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,77 +31,61 @@ local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
 local NetModule = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net"))
 local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 local CommE = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommE")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local GuiService = game:GetService("GuiService")
-local Lighting = game:GetService("Lighting")
-
-local RegisterAttack = Net:WaitForChild("RE/RegisterAttack")
-local RegisterHit = Net:WaitForChild("RE/RegisterHit")
-
-local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
-
-local request = http_request or request
-local getServers
+local HttpService = game:GetService("HttpService")
 
 local plr = game.Players.LocalPlayer
 local character = plr.Character or plr.CharacterAdded:Wait()
 local character2 = charFolder:FindFirstChild(plr.Name)
 
--- seas
 local First_Sea = false
 local Second_Sea = false
 local Third_Sea = false
 local placeId = game.PlaceId
-
 if placeId == 2753915549 then First_Sea = true
 elseif placeId == 4442272183 then Second_Sea = true
 elseif placeId == 7449423635 then Third_Sea = true
 end
 
--- sword list
 local swordList = {
-    "Cutlass", "Katana", "Dual Katana", "Triple Katana", "Iron Mace", "Shark Saw",
-    "Twin Hooks", "Dragon Trident", "Dual-Headed Blade", "Flail", "Gravity Blade",
-    "Longsword", "Pipe", "Soul Cane", "Trident", "Wardens Sword", "Bisento",
-    "Buddy Sword", "Canvander", "Dark Dagger", "Dragonheart", "Fox Lamp", "Koko",
-    "Midnight Blade", "Oroshi", "Pole (1st Form)", "Pole (2nd Form)", "Rengoku",
-    "Saber", "Saishi", "Shark Anchor", "Shizu", "Spikey Trident", "Tushita",
-    "Yama", "Cursed Dual Katana", "Dark Blade", "Hallow Scythe", "True Triple Katana"
+    "Cutlass","Katana","Dual Katana","Triple Katana","Iron Mace","Shark Saw",
+    "Twin Hooks","Dragon Trident","Dual-Headed Blade","Flail","Gravity Blade",
+    "Longsword","Pipe","Soul Cane","Trident","Wardens Sword","Bisento",
+    "Buddy Sword","Canvander","Dark Dagger","Dragonheart","Fox Lamp","Koko",
+    "Midnight Blade","Oroshi","Pole (1st Form)","Pole (2nd Form)","Rengoku",
+    "Saber","Saishi","Shark Anchor","Shizu","Spikey Trident","Tushita",
+    "Yama","Cursed Dual Katana","Dark Blade","Hallow Scythe","True Triple Katana"
 }
 
--- quests
--- format: ["display name"] = {RemoteQuestName, QuestLevelIndex, Sea}
 local quests = {
-    -- sea 1
-    ["[Lv.1] Bandit"] = {"BanditQuest1", 1, "First"}, 
-    ["[Lv.10] Monkey"] = {"JungleQuest", 1, "First"}, 
-    ["[Lv.15] Gorilla"] = {"JungleQuest", 2, "First"}, 
-    ["[Lv.25] The Gorilla King [Boss]"] = {"JungleQuest", 3, "First"}, 
-    ["[Lv.30] Pirate"] = {"BuggyQuest1", 1, "First"}, 
-    ["[Lv.40] Brute"] = {"BuggyQuest1", 2, "First"}, 
+    ["[Lv.1] Bandit"] = {"BanditQuest1", 1, "First"},
+    ["[Lv.10] Monkey"] = {"JungleQuest", 1, "First"},
+    ["[Lv.15] Gorilla"] = {"JungleQuest", 2, "First"},
+    ["[Lv.25] The Gorilla King [Boss]"] = {"JungleQuest", 3, "First"},
+    ["[Lv.30] Pirate"] = {"BuggyQuest1", 1, "First"},
+    ["[Lv.40] Brute"] = {"BuggyQuest1", 2, "First"},
     ["[Lv.55] Chef [Boss]"] = {"BuggyQuest1", 3, "First"},
     ["[Lv.60] Desert Bandit"] = {"DesertQuest", 1, "First"},
-    ["[Lv.75] Desert Officer"] = {"DesertQuest", 2, "First"}, 
+    ["[Lv.75] Desert Officer"] = {"DesertQuest", 2, "First"},
     ["[Lv.90] Snow Bandit"] = {"SnowQuest", 1, "First"},
-    ["[Lv.100] Snowman"] = {"SnowQuest", 2, "First"}, 
-    ["[Lv.110] Yeti [Boss]"] = {"SnowQuest", 3, "First"}, 
+    ["[Lv.100] Snowman"] = {"SnowQuest", 2, "First"},
+    ["[Lv.110] Yeti [Boss]"] = {"SnowQuest", 3, "First"},
     ["[Lv.120] Chief Petty Officer"] = {"MarineQuest2", 1, "First"},
-    ["[Lv.130] Vice Admiral [Boss]"] = {"MarineQuest2", 2, "First"}, 
+    ["[Lv.130] Vice Admiral [Boss]"] = {"MarineQuest2", 2, "First"},
     ["[Lv.150] Sky Bandit"] = {"SkyQuest", 1, "First"},
-    ["[Lv.175] Dark Master"] = {"SkyQuest", 2, "First"}, 
-    ["[Lv.190] Prisoner"] = {"PrisonerQuest", 1, "First"}, 
-    ["[Lv.210] Dangerous Prisoner"] = {"PrisonerQuest", 2, "First"}, 
-    ["[Lv.220] Warden [Boss]"] = {"ImpelQuest", 1, "First"}, 
-    ["[Lv.230] Chief Warden [Boss]"] = {"ImpelQuest", 2, "First"}, 
-    ["[Lv.240] Swan [Boss]"] = {"ImpelQuest", 3, "First"}, 
+    ["[Lv.175] Dark Master"] = {"SkyQuest", 2, "First"},
+    ["[Lv.190] Prisoner"] = {"PrisonerQuest", 1, "First"},
+    ["[Lv.210] Dangerous Prisoner"] = {"PrisonerQuest", 2, "First"},
+    ["[Lv.220] Warden [Boss]"] = {"ImpelQuest", 1, "First"},
+    ["[Lv.230] Chief Warden [Boss]"] = {"ImpelQuest", 2, "First"},
+    ["[Lv.240] Swan [Boss]"] = {"ImpelQuest", 3, "First"},
     ["[Lv.250] Toga Warrior"] = {"ColosseumQuest", 1, "First"},
     ["[Lv.275] Gladiator"] = {"ColosseumQuest", 2, "First"},
     ["[Lv.300] Military Soldier"] = {"MagmaQuest", 1, "First"},
     ["[Lv.325] Military Spy"] = {"MagmaQuest", 2, "First"},
-    ["[Lv.350] Magma Admiral [Boss]"] = {"MagmaQuest", 3, "First"}, 
+    ["[Lv.350] Magma Admiral [Boss]"] = {"MagmaQuest", 3, "First"},
     ["[Lv.375] Fishman Warrior"] = {"FishmanQuest", 1, "First"},
-    ["[Lv.400] Fishman Commando"] = {"FishmanQuest", 2, "First"}, 
+    ["[Lv.400] Fishman Commando"] = {"FishmanQuest", 2, "First"},
     ["[Lv.425] Fishman Lord [Boss]"] = {"FishmanQuest", 3, "First"},
     ["[Lv.450] God's Guard"] = {"SkyExp1Quest", 1, "First"},
     ["[Lv.475] Shanda"] = {"SkyExp1Quest", 2, "First"},
@@ -109,8 +96,6 @@ local quests = {
     ["[Lv.625] Galley Pirate"] = {"FountainQuest", 1, "First"},
     ["[Lv.650] Galley Captain"] = {"FountainQuest", 2, "First"},
     ["[Lv.675] Cyborg [Boss]"] = {"FountainQuest", 3, "First"},
-
-    -- sea 2
     ["[Lv.700] Raider"] = {"Area1Quest", 1, "Second"},
     ["[Lv.725] Mercenary"] = {"Area1Quest", 2, "Second"},
     ["[Lv.750] Diamond [Boss]"] = {"Area1Quest", 3, "Second"},
@@ -139,8 +124,6 @@ local quests = {
     ["[Lv.1425] Sea Soldier"] = {"ForgottenQuest", 1, "Second"},
     ["[Lv.1450] Water Fighter"] = {"ForgottenQuest", 2, "Second"},
     ["[Lv.1475] Tide Keeper [Boss]"] = {"ForgottenQuest", 3, "Second"},
-
-    -- sea 3
     ["[Lv.1500] Pirate Billionaire"] = {"PortQuest", 1, "Third"},
     ["[Lv.1525] Pirate Millionaire"] = {"PortQuest", 2, "Third"},
     ["[Lv.1550] Stone [Boss]"] = {"PortQuest", 3, "Third"},
@@ -177,26 +160,126 @@ local quests = {
     ["[Lv.2375] Candy Rebel"] = {"ChocQuest2", 2, "Third"},
     ["[Lv.2400] Candy Pirate"] = {"CandyQuest1", 1, "Third"},
     ["[Lv.2425] Snow Demon"] = {"CandyQuest1", 2, "Third"},
-    ["[Lv.2450] Isle Outlaw"] = {"TikiQuest1", 1, "Third"}
+    ["[Lv.2450] Isle Outlaw"] = {"TikiQuest1", 1, "Third"},
 }
 
+local request = http_request or request
+local getServers
+
+-- // ============================================================== Helpers ============================================================== \\ --
+
+local partCache = setmetatable({}, {__mode = "v"})
+local function getTargetPart(model)
+    if partCache[model] and partCache[model].Parent then return partCache[model] end
+    for _, part in ipairs(model:GetChildren()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            partCache[model] = part
+            return part
+        end
+    end
+    local fallback = model:FindFirstChildOfClass("BasePart")
+    partCache[model] = fallback
+    return fallback
+end
+
+local function attack(targetModel)
+    local targetPart = getTargetPart(targetModel)
+    if targetPart then
+        NetModule:RemoteEvent("RegisterAttack"):FireServer(0)
+        NetModule:RemoteEvent("RegisterHit"):FireServer(targetPart, {})
+    end
+end
+
+local function attackTRex(targetHrp)
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if not hrp or not targetHrp then return end
+    local direction = (targetHrp.Position - hrp.Position).Unit
+    local tRexFolder = character:FindFirstChild("T-Rex-T-Rex")
+    if not tRexFolder then
+        local tool = character:FindFirstChildOfClass("Tool")
+        if tool and tool.Name:find("T%-Rex") then tRexFolder = tool end
+    end
+    if not tRexFolder then return end
+    local remote = tRexFolder:FindFirstChild("LeftClickRemote")
+    if not remote then return end
+    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 1)
+    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 2)
+    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 3)
+end
+
+local function attackTRexCustom(targetHrp, direction)
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if not hrp or not targetHrp then return end
+    
+    local tRexFolder = character:FindFirstChild("T-Rex-T-Rex")
+    if not tRexFolder then
+        local tool = character:FindFirstChildOfClass("Tool")
+        if tool and tool.Name == "T-Rex-T-Rex" then tRexFolder = tool end
+    end
+    if not tRexFolder then return end
+    
+    local remote = tRexFolder:FindFirstChild("LeftClickRemote")
+    if not remote then return end
+    
+    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 1)
+    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 2)
+    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 3)
+end
+
+local function isUsingTRexFruit()
+    local char = plr.Character
+    if not char then return false end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and tool.Name:find("T%-Rex") then return true end
+    local data = plr:FindFirstChild("Data")
+    if not data then return false end
+    for _, obj in ipairs(data:GetChildren()) do
+        if obj:IsA("StringValue") and obj.Value == "T-Rex-T-Rex" then return true end
+    end
+    return false
+end
+
+local function scanSeaBeasts()
+    local seaBeastsFolder = workspace:FindFirstChild("SeaBeasts")
+    if not seaBeastsFolder then return {} end
+    
+    local seaBeasts = {}
+    for _, beast in ipairs(seaBeastsFolder:GetChildren()) do
+        if beast:IsA("Model") then
+            local beastHrp = beast:FindFirstChild("HumanoidRootPart")
+            local beastHum = beast:FindFirstChildOfClass("Humanoid")
+            if beastHrp and beastHum and beastHum.Health > 0 then
+                table.insert(seaBeasts, beast)
+            end
+        end
+    end
+    return seaBeasts
+end
+
+local function isSword(name)
+    for _, sword in ipairs(swordList) do
+        if name == sword then return true end
+    end
+    return false
+end
 
 -- // ============================================================== Combat Tab ============================================================== \\ --
-local combat = Init:NewTab("Combat")
-local mainS = combat:NewSection("Main")
+
+-- ===== Kill Aura =====
+local KillAuraBox = Tabs.Combat:AddLeftGroupbox('Kill Aura')
+
 local killAuraEnabled = false
 local auraRange = 50
 local auraSpeed = 20
 local auraSwitchDelay = 0
-local auraTargetType = "Mobs"
-local auraKey = Enum.KeyCode.Y
+local auraTargetTypes = {}
 local auraCircleEnabled = false
 local spoofWeaponEnabled = false
 local spoofWeaponType = "Melee"
 local currentTargetIndex = 1
 local instaKillMode = false
 
--- visual circle
+-- circle
 local circleAdornment = Instance.new("CylinderHandleAdornment")
 circleAdornment.Name = "AuraVisual"
 circleAdornment.Transparency = 0.3
@@ -218,103 +301,118 @@ local function updateCircle()
     end
 end
 
-local bodyParts = {
-    "UpperTorso", "LowerTorso", "Head",
-    "LeftUpperArm", "LeftLowerArm", "LeftHand",
-    "RightUpperArm", "RightLowerArm", "RightHand",
-    "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
-    "RightUpperLeg", "RightLowerLeg", "RightFoot"
-}
+task.spawn(function() while task.wait() do updateCircle() end end)
 
-local partCache = setmetatable({}, {__mode = "v"})
-
-local function getTargetPart(model)
-    if partCache[model] and partCache[model].Parent then
-        return partCache[model]
-    end
-    
-    for _, part in ipairs(model:GetChildren()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            partCache[model] = part
-            return part
+local function targetsStunned(targets)
+    for _, target in ipairs(targets) do
+        local stunVal = target:FindFirstChild("Stun")
+        if not stunVal or stunVal.Value <= 0 then
+            return false
         end
     end
-    
-    local fallback = model:FindFirstChildOfClass("BasePart")
-    partCache[model] = fallback
-    return fallback
+    return #targets > 0
 end
 
-local function fireHit(targetModel)
-    local targetPart = getTargetPart(targetModel)
-    if targetPart then
-        NetModule:RemoteEvent("RegisterAttack"):FireServer(0)
-        NetModule:RemoteEvent("RegisterHit"):FireServer(targetPart, {})
-    end
-end
+KillAuraBox:AddToggle('KillAuraEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Automatically attack nearby entities',
+}):AddKeyPicker('KillAuraKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Kill Aura',
+    SyncToggleState = true,
+})
 
-local function isUsingTRexFruit()
-    local data = plr:FindFirstChild("Data")
-    if not data then return false end
-    for _, obj in ipairs(data:GetChildren()) do
-        if obj:IsA("StringValue") and obj.Value == "T-Rex-T-Rex" then
-            return true
-        end
-    end
-    return false
-end
+KillAuraBox:AddDropdown('KillAuraTargets', {
+    Text = 'Targets',
+    Values = {'Mobs', 'Players', 'Sea Beasts'},
+    Default = {},
+    Multi = true,
+    Tooltip = 'Select which targets to attack',
+})
 
-local function fireTRexAttack(targetHrp)
-    local hrp = character and character:FindFirstChild("HumanoidRootPart")
-    if not hrp or not targetHrp then return end
+KillAuraBox:AddSlider('KillAuraRange', {
+    Text = 'Aura Range',
+    Default = 50,
+    Min = 1,
+    Max = 60,
+    Rounding = 0,
+    Suffix = ' studs',
+})
 
-    local direction = (targetHrp.Position - hrp.Position).Unit
-    local tRexFolder = character:FindFirstChild("T-Rex-T-Rex")
-    if not tRexFolder then return end
-    local remote = tRexFolder:FindFirstChild("LeftClickRemote")
-    if not remote then return end
+KillAuraBox:AddSlider('KillAuraSpeed', {
+    Text = 'Attack Speed',
+    Default = 20,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Suffix = ' APS',
+})
 
-    local args = {
-        vector.create(direction.X, direction.Y, direction.Z),
-        1
-    }
-    remote:FireServer(table.unpack(args))
-end
+KillAuraBox:AddSlider('KillAuraSwitchDelay', {
+    Text = 'Switch Delay',
+    Default = 0,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Suffix = 's',
+})
 
-local function getSWeapon()
-    local backpack = plr:FindFirstChild("Backpack")
-    if not backpack then return nil end
-    for _, tool in pairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") and tool:GetAttribute("WeaponType") == spoofWeaponType then
-            return tool
-        end
-    end
-    return nil
-end
+KillAuraBox:AddToggle('KillAuraSpoofWeapon', {
+    Text = 'Spoof Weapon',
+    Default = false,
+    Tooltip = 'Attack without holding a weapon',
+})
 
-killAuraToggle = combat:NewToggle("Kill Aura", false, function(v)
-    killAuraEnabled = v
-    if v then
-        Notif:Notify("Enabled Kill Aura", 5, "success")
+local SpoofDepbox = KillAuraBox:AddDependencyBox()
+SpoofDepbox:AddDropdown('KillAuraSpoofType', {
+    Text = 'Weapon Type',
+    Values = {'Melee', 'Sword', 'Demon Fruit'},
+    Default = 1,
+    Tooltip = 'Type to spoof as',
+})
+SpoofDepbox:SetupDependencies({ {Toggles.KillAuraSpoofWeapon, true} })
+
+KillAuraBox:AddToggle('KillAuraVisualCircle', {
+    Text = 'Visual Circle',
+    Default = false,
+    Tooltip = 'Shows the range circle',
+})
+
+KillAuraBox:AddToggle('KillAuraInstaKill', {
+    Text = 'Insta-Kill',
+    Default = false,
+    Tooltip = "Conqueror's Haki",
+})
+
+Options.KillAuraTargets:OnChanged(function()
+    auraTargetTypes = Options.KillAuraTargets.Value
+end)
+
+Toggles.KillAuraEnabled:OnChanged(function()
+    killAuraEnabled = Toggles.KillAuraEnabled.Value
+    if killAuraEnabled then
         task.spawn(function()
             local enemiesFolder = workspace:FindFirstChild("Enemies")
             local charactersFolder = workspace:FindFirstChild("Characters")
             local lastTargetScan = 0
             local cachedTargets = {}
-            
+
             while killAuraEnabled do
                 local startTime = os.clock()
                 local delayTime = math.max(auraSwitchDelay, 1 / math.max(auraSpeed, 1))
-                
                 local char = plr.Character
+
                 if char then
                     local hum = char:FindFirstChild("Humanoid")
                     local hrp = char:FindFirstChild("HumanoidRootPart")
-                    
+
                     if hum and hum.Health > 0 and hrp then
                         if instaKillMode then
                             if startTime - lastTargetScan > 0.1 then
-                                if enemiesFolder then
+                                if auraTargetTypes and auraTargetTypes.Mobs and enemiesFolder then
                                     for _, target in ipairs(enemiesFolder:GetChildren()) do
                                         local targetHum = target:FindFirstChildOfClass("Humanoid")
                                         if targetHum and targetHum.Health > 0 then
@@ -325,25 +423,37 @@ killAuraToggle = combat:NewToggle("Kill Aura", false, function(v)
                                         end
                                     end
                                 end
+                                
+                                if auraTargetTypes and auraTargetTypes.Players and charactersFolder then
+                                    for _, target in ipairs(charactersFolder:GetChildren()) do
+                                        if target == char then continue end
+                                        local targetHum = target:FindFirstChildOfClass("Humanoid")
+                                        if targetHum and targetHum.Health > 0 then
+                                            local targetHrp = target:FindFirstChild("HumanoidRootPart")
+                                            if targetHrp and (hrp.Position - targetHrp.Position).Magnitude < 1000 then
+                                                targetHum.Health = 0
+                                            end
+                                        end
+                                    end
+                                end
+                                
                                 lastTargetScan = startTime
                             end
                         else
                             local currentTool = char:FindFirstChildOfClass("Tool")
-                            local usingTRex = isUsingTRexFruit()
+                            local hasTRexTool = currentTool and currentTool.Name == "T-Rex-T-Rex"
+                            local usingTRex = hasTRexTool and isUsingTRexFruit()
 
-                            local canAttack = (currentTool and currentTool.ToolTip ~= "Gun") or spoofWeaponEnabled
-                            local usingDemonFruit = spoofWeaponEnabled and spoofWeaponType == "Demon Fruit"
+                            local canAttackNormally = (not usingTRex) and (spoofWeaponEnabled or (currentTool and currentTool.ToolTip ~= "Gun"))
 
-                            if usingDemonFruit and usingTRex then
-                                canAttack = true
-                            end
-                            
-                            if canAttack then
+                            if usingTRex or canAttackNormally then
                                 if startTime - lastTargetScan > 0.3 then
                                     cachedTargets = {}
                                     
-                                    if auraTargetType == "Mobs" and enemiesFolder then
-                                        for _, target in ipairs(enemiesFolder:GetChildren()) do
+                                    local function scanFolder(folder, skipSelf)
+                                        if not folder then return end
+                                        for _, target in ipairs(folder:GetChildren()) do
+                                            if skipSelf and target == char then continue end
                                             local targetHrp = target:FindFirstChild("HumanoidRootPart")
                                             local targetHum = target:FindFirstChild("Humanoid")
                                             if targetHrp and targetHum and targetHum.Health > 0 then
@@ -352,40 +462,23 @@ killAuraToggle = combat:NewToggle("Kill Aura", false, function(v)
                                                 end
                                             end
                                         end
-                                    elseif auraTargetType == "Players" and charactersFolder then
-                                        for _, target in ipairs(charactersFolder:GetChildren()) do
-                                            if target ~= char then
-                                                local targetHrp = target:FindFirstChild("HumanoidRootPart")
-                                                local targetHum = target:FindFirstChild("Humanoid")
-                                                if targetHrp and targetHum and targetHum.Health > 0 then
-                                                    if (hrp.Position - targetHrp.Position).Magnitude < auraRange then
-                                                        table.insert(cachedTargets, target)
-                                                    end
-                                                end
-                                            end
+                                    end
+                                    
+                                    if auraTargetTypes then
+                                        if auraTargetTypes.Mobs then
+                                            scanFolder(enemiesFolder, false)
                                         end
-                                    elseif auraTargetType == "Both" then
-                                        if enemiesFolder then
-                                            for _, target in ipairs(enemiesFolder:GetChildren()) do
-                                                local targetHrp = target:FindFirstChild("HumanoidRootPart")
-                                                local targetHum = target:FindFirstChild("Humanoid")
-                                                if targetHrp and targetHum and targetHum.Health > 0 then
-                                                    if (hrp.Position - targetHrp.Position).Magnitude < auraRange then
-                                                        table.insert(cachedTargets, target)
-                                                    end
-                                                end
-                                            end
+                                        
+                                        if auraTargetTypes.Players then
+                                            scanFolder(charactersFolder, true)
                                         end
-                                        if charactersFolder then
-                                            for _, target in ipairs(charactersFolder:GetChildren()) do
-                                                if target ~= char then
-                                                    local targetHrp = target:FindFirstChild("HumanoidRootPart")
-                                                    local targetHum = target:FindFirstChild("Humanoid")
-                                                    if targetHrp and targetHum and targetHum.Health > 0 then
-                                                        if (hrp.Position - targetHrp.Position).Magnitude < auraRange then
-                                                            table.insert(cachedTargets, target)
-                                                        end
-                                                    end
+                                        
+                                        if auraTargetTypes['Sea Beasts'] then
+                                            local seaBeasts = scanSeaBeasts()
+                                            for _, beast in ipairs(seaBeasts) do
+                                                local beastHrp = beast:FindFirstChild("HumanoidRootPart")
+                                                if beastHrp and (hrp.Position - beastHrp.Position).Magnitude < auraRange then
+                                                    table.insert(cachedTargets, beast)
                                                 end
                                             end
                                         end
@@ -393,91 +486,53 @@ killAuraToggle = combat:NewToggle("Kill Aura", false, function(v)
                                     
                                     lastTargetScan = startTime
                                 end
-                                
+
                                 if #cachedTargets > 0 then
-                                    if currentTargetIndex > #cachedTargets then 
-                                        currentTargetIndex = 1 
-                                    end
-                                    
+                                    if currentTargetIndex > #cachedTargets then currentTargetIndex = 1 end
                                     local target = cachedTargets[currentTargetIndex]
                                     local targetHrp = target:FindFirstChild("HumanoidRootPart")
 
-                                    if usingDemonFruit and usingTRex and targetHrp then
-                                        fireTRexAttack(targetHrp)
-                                    elseif spoofWeaponEnabled then
-                                        fireHit(target)
-                                    elseif currentTool then
-                                        fireHit(target)
+                                    if usingTRex and targetHrp then
+                                        local isSeaBeast = target.Parent and target.Parent.Name == "SeaBeasts"
+                                        
+                                        if isSeaBeast then
+                                            if hrp.Position.Y < targetHrp.Position.Y then
+                                                attackTRexCustom(targetHrp, Vector3.new(0, 1, 0))
+                                            else
+                                                attackTRexCustom(targetHrp, Vector3.new(0, -1, 0))
+                                            end
+                                        elseif targetsStunned(cachedTargets) then
+                                            attackTRexCustom(targetHrp, Vector3.new(0, -1, 0))
+                                        else
+                                            attackTRex(targetHrp)
+                                        end
+                                    elseif canAttackNormally then
+                                        attack(target)
                                     end
-                                    
+
                                     currentTargetIndex = currentTargetIndex + 1
                                 end
                             end
                         end
                     end
                 end
-                
+
                 task.wait(delayTime)
             end
         end)
-    else
-        Notif:Notify("Disabled Kill Aura", 5, "error")
-    end
-end)
-killAuraToggle:AddKeybind(auraKey)
-
-local auraTargetSelect = combat:NewSelector("Targets", "Select who to target", {"Players", "Mobs", "Both"}, function(v)
-    auraTargetType = v
-end)
-
-local auraRangeSlider = combat:NewSlider("Aura Range", " Studs", false, "/", {min = 1, max = 60, default = 50}, function(v)
-    auraRange = v
-end)
-
-local auraSpeedSlider = combat:NewSlider("Attack Speed", " Attack/s", false, "/", {min = 1, max = 100, default = 20}, function(v)
-    auraSpeed = v
-end)
-
-local auraSwitchSlider = combat:NewSlider("Switch Delay", " Second", false, "/", {min = 0, max = 1, default = 0}, function(v)
-    auraSwitchDelay = v
-end)
-
-local spoofToggle = combat:NewToggle("Spoof Weapon", false, function(v)
-    spoofWeaponEnabled = v
-end)
-
-local spoofTypeSelect = combat:NewSelector("Weapon Type", "Select a weapon", {"Melee", "Sword", "Demon Fruit"}, function(v)
-    spoofWeaponType = v
-end)
-
-local auraCircleToggle = combat:NewToggle("Visual Circle", false, function(v)
-    auraCircleEnabled = v
-end)
-
-local instaKillToggle = combat:NewToggle("Insta-Kill", false, function(v)
-    instaKillMode = v
-end)
-
-task.spawn(function()
-    while task.wait() do
-        updateCircle()
     end
 end)
 
-task.spawn(function()
-    while task.wait() do
-        local s = killAuraEnabled
-        local sw = spoofWeaponEnabled
-        auraTargetSelect[s and "Show" or "Hide"](auraTargetSelect)
-        auraRangeSlider[s and "Show" or "Hide"](auraRangeSlider)
-        auraSpeedSlider[s and "Show" or "Hide"](auraSpeedSlider)
-        auraSwitchSlider[s and "Show" or "Hide"](auraSwitchSlider)
-        auraCircleToggle[s and "Show" or "Hide"](auraCircleToggle)
-        spoofToggle[s and "Show" or "Hide"](spoofToggle)
-        spoofTypeSelect[(s and sw) and "Show" or "Hide"](spoofTypeSelect)
-        instaKillToggle[s and "Show" or "Hide"](instaKillToggle)
-    end
-end)
+Options.KillAuraRange:OnChanged(function() auraRange = Options.KillAuraRange.Value end)
+Options.KillAuraSpeed:OnChanged(function() auraSpeed = Options.KillAuraSpeed.Value end)
+Options.KillAuraSwitchDelay:OnChanged(function() auraSwitchDelay = Options.KillAuraSwitchDelay.Value end)
+Toggles.KillAuraSpoofWeapon:OnChanged(function() spoofWeaponEnabled = Toggles.KillAuraSpoofWeapon.Value end)
+Options.KillAuraSpoofType:OnChanged(function() spoofWeaponType = Options.KillAuraSpoofType.Value end)
+Toggles.KillAuraVisualCircle:OnChanged(function() auraCircleEnabled = Toggles.KillAuraVisualCircle.Value end)
+Toggles.KillAuraInstaKill:OnChanged(function() instaKillMode = Toggles.KillAuraInstaKill.Value end)
+
+-- ===== Aimbot =====
+local AimbotBox = Tabs.Combat:AddRightGroupbox('Aimbot')
 
 local aimbotEnabled = false
 local aimbotFOV = 150
@@ -485,7 +540,6 @@ local aimbotTargetType = "Mobs"
 local aimbotCurrentTarget = nil
 local aimbotHighlightEnabled = false
 local aimbotHighlight = nil
-
 local camera = workspace.CurrentCamera
 
 local aimbotCircle = Drawing.new("Circle")
@@ -495,26 +549,30 @@ aimbotCircle.Color = Color3.fromRGB(255, 255, 255)
 aimbotCircle.Transparency = 1
 aimbotCircle.Filled = false
 aimbotCircle.NumSides = 200
+aimbotCircle.Radius = aimbotFOV
 
-local function getMouseScreenPos()
-    return UserInputService:GetMouseLocation()
-end
+local function getMouseScreenPos() return UserInputService:GetMouseLocation() end
 
 local function worldToScreen(pos)
-    local screenPos, onScreen = camera:WorldToViewportPoint(pos)
-    return Vector2.new(screenPos.X, screenPos.Y), onScreen, screenPos.Z
+    local sp, onScreen = camera:WorldToViewportPoint(pos)
+    return Vector2.new(sp.X, sp.Y), onScreen, sp.Z
 end
 
 local function getBestTarget()
     local mousePos = getMouseScreenPos()
-    local bestTarget = nil
-    local bestDist = math.huge
-
-    local folders = aimbotTargetType == "Players" and {workspace.Characters}
-        or aimbotTargetType == "Mobs" and {workspace.Enemies}
-        or {workspace.Enemies, workspace.Characters}
-
+    local bestTarget, bestDist = nil, math.huge
+    local folders = {}
+    
+    if aimbotTargetType == "Players" then
+        folders = {workspace:FindFirstChild("Characters")}
+    elseif aimbotTargetType == "Mobs" then
+        folders = {workspace:FindFirstChild("Enemies")}
+    elseif aimbotTargetType == "Both" then
+        folders = {workspace:FindFirstChild("Enemies"), workspace:FindFirstChild("Characters")}
+    end
+    
     for _, folder in ipairs(folders) do
+        if not folder then continue end
         for _, target in ipairs(folder:GetChildren()) do
             local hrp = target:FindFirstChild("HumanoidRootPart")
             local hum = target:FindFirstChild("Humanoid")
@@ -537,8 +595,8 @@ local function getBestTarget()
 end
 
 local function clearHighlight()
-    if aimbotHighlight and aimbotHighlight.Parent then
-        aimbotHighlight:Destroy()
+    if aimbotHighlight and aimbotHighlight.Parent then 
+        aimbotHighlight:Destroy() 
     end
     aimbotHighlight = nil
 end
@@ -578,9 +636,7 @@ task.spawn(function()
                     modified = true
                 end
             end
-            if modified then
-                return old(self, table.unpack(args, 1, args.n))
-            end
+            if modified then return old(self, table.unpack(args, 1, args.n)) end
         end
         return old(self, ...)
     end)
@@ -589,123 +645,159 @@ end)
 
 task.spawn(function()
     local lastTarget = nil
+    local lastUpdate = 0
+    
     while task.wait() do
         local mousePos = getMouseScreenPos()
-
+        
         if aimbotEnabled then
             aimbotCircle.Visible = true
             aimbotCircle.Position = mousePos
             aimbotCircle.Radius = aimbotFOV
-        else
-            aimbotCircle.Visible = false
-            aimbotCurrentTarget = nil
-        end
-
-        if aimbotEnabled then
-            local target = getBestTarget()
-            if target then
-                local screenPos, onScreen = worldToScreen(target.Position)
-                if onScreen then
-                    aimbotCurrentTarget = target
-                    if aimbotHighlightEnabled and target ~= lastTarget then
-                        applyHighlight(target)
-                        lastTarget = target
+            
+            local currentTime = tick()
+            if currentTime - lastUpdate > 0.1 then
+                local target = getBestTarget()
+                if target then
+                    local screenPos, onScreen = worldToScreen(target.Position)
+                    if onScreen then
+                        aimbotCurrentTarget = target
+                        if aimbotHighlightEnabled and target ~= lastTarget then
+                            applyHighlight(target)
+                            lastTarget = target
+                        end
+                    else
+                        aimbotCurrentTarget = nil
                     end
                 else
                     aimbotCurrentTarget = nil
+                    if lastTarget ~= nil then 
+                        clearHighlight() 
+                        lastTarget = nil 
+                    end
                 end
-            else
-                aimbotCurrentTarget = nil
-                if lastTarget ~= nil then
-                    clearHighlight()
-                    lastTarget = nil
-                end
-            end
-
-            if not aimbotHighlightEnabled then
-                clearHighlight()
-                lastTarget = nil
+                lastUpdate = currentTime
             end
         else
+            aimbotCircle.Visible = false
+            aimbotCurrentTarget = nil
             clearHighlight()
             lastTarget = nil
+        end
+        
+        if not aimbotHighlightEnabled then 
+            clearHighlight() 
+            lastTarget = nil 
         end
     end
 end)
 
-local aimbotToggle = combat:NewToggle("Aimbot", false, function(v)
-    aimbotEnabled = v
-    if v then
-        Notif:Notify("Enabled Aimbot", 5, "success")
-    else
-        aimbotCircle.Visible = false
+-- UI Elements
+AimbotBox:AddToggle('AimbotEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Silently aims at entities (only for skills tho)',
+}):AddKeyPicker('AimbotKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Aimbot',
+    SyncToggleState = true,
+})
+
+AimbotBox:AddLabel('FOV Color'):AddColorPicker('AimbotFOVColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = 'FOV Circle Color',
+    Transparency = 0,
+})
+
+Options.AimbotFOVColor:OnChanged(function()
+    aimbotCircle.Color = Options.AimbotFOVColor.Value
+end)
+
+AimbotBox:AddDropdown('AimbotTargets', {
+    Text = 'Targets',
+    Values = {'Mobs', 'Players', 'Both'},
+    Default = 1,
+    Tooltip = 'Who to target',
+})
+
+AimbotBox:AddSlider('AimbotFOV', {
+    Text = 'FOV Size',
+    Default = 150,
+    Min = 10,
+    Max = 800,
+    Rounding = 0,
+    Suffix = ' px',
+})
+
+AimbotBox:AddToggle('AimbotHighlight', {
+    Text = 'Highlight Target',
+    Default = false,
+    Tooltip = 'Highlight the current aimbot target',
+})
+
+-- callbacks
+Toggles.AimbotEnabled:OnChanged(function() 
+    aimbotEnabled = Toggles.AimbotEnabled.Value
+    if not aimbotEnabled then
         aimbotCurrentTarget = nil
         clearHighlight()
-        Notif:Notify("Disabled Aimbot", 5, "error")
     end
 end)
 
-local aimbotTargetSel = combat:NewSelector("Aimbot Targets", "Select targets", {"Players", "Mobs", "Both"}, function(v)
-    aimbotTargetType = v
+Options.AimbotTargets:OnChanged(function() 
+    aimbotTargetType = Options.AimbotTargets.Value 
 end)
 
-local aimbotFOVSlider = combat:NewSlider("FOV Size", " px", false, "/", {min = 10, max = 800, default = 150}, function(v)
-    aimbotFOV = v
+Options.AimbotFOV:OnChanged(function() 
+    aimbotFOV = Options.AimbotFOV.Value 
+    aimbotCircle.Radius = aimbotFOV
 end)
 
-local aimbotHighlightToggle = combat:NewToggle("Highlight Target", false, function(v)
-    aimbotHighlightEnabled = v
-    if not v then clearHighlight() end
-end)
-
-task.spawn(function()
-    while task.wait() do
-        local a = aimbotEnabled
-        aimbotTargetSel[a and "Show" or "Hide"](aimbotTargetSel)
-        aimbotFOVSlider[a and "Show" or "Hide"](aimbotFOVSlider)
-        aimbotHighlightToggle[a and "Show" or "Hide"](aimbotHighlightToggle)
+Toggles.AimbotHighlight:OnChanged(function()
+    aimbotHighlightEnabled = Toggles.AimbotHighlight.Value
+    if not aimbotHighlightEnabled then 
+        clearHighlight() 
     end
 end)
 
-local otherS = combat:NewSection("Other")
-local function isSword(name)
-    for _, sword in ipairs(swordList) do
-        if name == sword then return true end
-    end
-    return false
-end
+-- ===== Fast Attack =====
+local FastAttackBox = Tabs.Combat:AddLeftGroupbox('Fast Attack')
 
 local fastAttackEnabled = false
 local fastAttackConnection
 local attackDistance = 10
 local oldAttackSpeed = 1
 
-local fastAttack = combat:NewToggle("Fast Attack", false, function(value)
-    fastAttackEnabled = value
-    if value then
-        if character then
-            oldAttackSpeed = character:GetAttribute("AttackSpeedMultiplier") or 1
-        end
+FastAttackBox:AddToggle('FastAttack', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Attack faster',
+}):AddKeyPicker('FastAttackKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Fast Attack',
+    SyncToggleState = true,
+})
 
-        Notif:Notify("Enabled Fast Attack", 5, "success")
-
+Toggles.FastAttack:OnChanged(function()
+    fastAttackEnabled = Toggles.FastAttack.Value
+    if fastAttackEnabled then
+        if character then oldAttackSpeed = character:GetAttribute("AttackSpeedMultiplier") or 1 end
         fastAttackConnection = RunService.Stepped:Connect(function()
             if not fastAttackEnabled then
                 if fastAttackConnection then fastAttackConnection:Disconnect() end
                 return
             end
-
             character:SetAttribute("AttackSpeedMultiplier", 5)
-
             if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
                 if not (character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0) then return end
-
                 local tool = character:FindFirstChildOfClass("Tool")
                 if tool and tool.ToolTip ~= "Gun" then
                     local nearest, nearestDist = nil, math.huge
-                    local targetFolders = {workspace.Enemies, workspace.Characters}
-
-                    for _, folder in pairs(targetFolders) do
+                    for _, folder in pairs({workspace.Enemies, workspace.Characters}) do
                         for _, enemy in pairs(folder:GetChildren()) do
                             local hrp = enemy:FindFirstChild("HumanoidRootPart")
                             local hum = enemy:FindFirstChild("Humanoid")
@@ -718,7 +810,6 @@ local fastAttack = combat:NewToggle("Fast Attack", false, function(value)
                             end
                         end
                     end
-
                     if nearest then
                         pcall(function()
                             NetModule:RemoteEvent("RegisterAttack"):FireServer(0)
@@ -729,93 +820,92 @@ local fastAttack = combat:NewToggle("Fast Attack", false, function(value)
             end
         end)
     else
-        if fastAttackConnection then
-            fastAttackConnection:Disconnect()
-            fastAttackConnection = nil
-        end
-
-        if character then
-            character:SetAttribute("AttackSpeedMultiplier", oldAttackSpeed)
-        end
-
-        Notif:Notify("Disabled Fast Attack", 5, "error")
+        if fastAttackConnection then fastAttackConnection:Disconnect() fastAttackConnection = nil end
+        if character then character:SetAttribute("AttackSpeedMultiplier", oldAttackSpeed) end
     end
 end)
+
+-- ===== No Fruit M1 Cooldown =====
+local NoFruitM1Box = Tabs.Combat:AddRightGroupbox('No Fruit M1 Cooldown')
 
 local noFM1Enabled = false
 local noFM1Connection
-local defaultFruitM1Speed = 0
-local noFruitM1Cooldown = combat:NewToggle("No Fruit M1 Cooldown", false, function(value)
-    noFM1Enabled = value
-    
-    if value then
+local defaultFM1Speed = 0
+
+NoFruitM1Box:AddToggle('NoFruitM1', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Removes fruit M1 attack cooldown',
+}):AddKeyPicker('NoFruitM1Keybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'No Fruit M1 Cooldown',
+    SyncToggleState = true,
+})
+
+Toggles.NoFruitM1:OnChanged(function()
+    noFM1Enabled = Toggles.NoFruitM1.Value
+    if noFM1Enabled then
         if character2 then
-            local defaultFruitM1Speed = character2:GetAttribute("FruitTAPCooldown")
-            if defaultFruitM1Speed then
-                defaultFM1Speed = defaultFruitM1Speed
-            end
+            local val = character2:GetAttribute("FruitTAPCooldown")
+            if val then defaultFM1Speed = val end
         end
-
-        Notif:Notify("Enabled No Fruit M1 Cooldown", 5, "success")
-        
-        noFM1Connection = game:GetService("RunService").Heartbeat:Connect(function()
-            if not noFM1Enabled then 
-                if noFM1Connection then noFM1Connection:Disconnect() end
-                return 
-            end
-
-            if charFolder then
-                local character2 = charFolder:FindFirstChild(plr.Name)
-                if character2 then
-                    character2:SetAttribute("FruitTAPCooldown", 1)
-                end
-            end
+        noFM1Connection = RunService.Heartbeat:Connect(function()
+            if not noFM1Enabled then if noFM1Connection then noFM1Connection:Disconnect() end return end
+            local c2 = charFolder:FindFirstChild(plr.Name)
+            if c2 then c2:SetAttribute("FruitTAPCooldown", 1) end
         end)
     else
-        if noFM1Connection then
-            noFM1Connection:Disconnect()
-            noFM1Connection = nil
-        end
-        
-        if character2 then
-            character2:SetAttribute("FruitTAPCooldown", defaultFM1Speed)
-        end
-        
-        Notif:Notify("Disabled No Fruit M1 Cooldown", 5, "error")
+        if noFM1Connection then noFM1Connection:Disconnect() noFM1Connection = nil end
+        if character2 then character2:SetAttribute("FruitTAPCooldown", defaultFM1Speed) end
     end
 end)
+
+-- ===== Sword Reach =====
+local SwordReachBox = Tabs.Combat:AddLeftGroupbox('Sword Reach')
 
 local rangeEnabled = false
 local rangeX, rangeY, rangeZ = 50, 50, 50
 local originalSizes = {}
-local hitboxConnection
-local extendRange = combat:NewToggle("Sword Reach", false, function(v)
-    rangeEnabled = v
-    if not v then
-        Notif:Notify("Disabled Sword Reach", 5, "error")
+local hitboxConnection2
+
+SwordReachBox:AddToggle('SwordReach', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Extend sword hitboxes',
+}):AddKeyPicker('SwordReachKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Sword Reach',
+    SyncToggleState = true,
+})
+
+SwordReachBox:AddSlider('SwordReachX', { Text = 'X Reach', Default = 50, Min = 1, Max = 100, Rounding = 0 })
+SwordReachBox:AddSlider('SwordReachY', { Text = 'Y Reach', Default = 50, Min = 1, Max = 100, Rounding = 0 })
+SwordReachBox:AddSlider('SwordReachZ', { Text = 'Z Reach', Default = 50, Min = 1, Max = 100, Rounding = 0 })
+
+Toggles.SwordReach:OnChanged(function()
+    rangeEnabled = Toggles.SwordReach.Value
+    if not rangeEnabled then
         for part, size in pairs(originalSizes) do
-            if part and part.Parent then
-                part.Size = size
-            end
+            if part and part.Parent then part.Size = size end
         end
         originalSizes = {}
-        if hitboxConnection then hitboxConnection:Disconnect() end
+        if hitboxConnection2 then hitboxConnection2:Disconnect() end
     else
-        Notif:Notify("Enabled Sword Reach", 5, "success")
-        hitboxConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        hitboxConnection2 = RunService.Heartbeat:Connect(function()
             if not rangeEnabled then return end
-            
             local tool = character:FindFirstChildOfClass("Tool")
             if tool and isSword(tool.Name) then
                 local weaponModel = character:FindFirstChild("EquippedWeapon")
                 if weaponModel then
                     for _, part in ipairs(weaponModel:GetDescendants()) do
                         if part.Name == "Handle" and part:IsA("BasePart") then
-                            if not originalSizes[part] then
-                                originalSizes[part] = part.Size
-                            end
+                            if not originalSizes[part] then originalSizes[part] = part.Size end
                             part.Size = Vector3.new(rangeX, rangeY, rangeZ)
-                            part.CanCollide = false 
+                            part.CanCollide = false
                             part.Massless = true
                         end
                     end
@@ -824,32 +914,44 @@ local extendRange = combat:NewToggle("Sword Reach", false, function(v)
         end)
     end
 end)
+Options.SwordReachX:OnChanged(function() rangeX = Options.SwordReachX.Value end)
+Options.SwordReachY:OnChanged(function() rangeY = Options.SwordReachY.Value end)
+Options.SwordReachZ:OnChanged(function() rangeZ = Options.SwordReachZ.Value end)
 
-local sliderX = combat:NewSlider("X Reach", "", true, "/", {min = 1, max = 100, default = 50}, function(v) rangeX = v end)
-local sliderY = combat:NewSlider("Y Reach", "", true, "/", {min = 1, max = 100, default = 50}, function(v) rangeY = v end)
-local sliderZ = combat:NewSlider("Z Reach", "", true, "/", {min = 1, max = 100, default = 50}, function(v) rangeZ = v end)
-
-task.spawn(function()
-    while task.wait() do
-        if rangeEnabled then
-            sliderX:Show() sliderY:Show() sliderZ:Show()
-        else
-            sliderX:Hide() sliderY:Hide() sliderZ:Hide()
-        end
-    end
-end)
+-- ===== Hitboxes =====
+local IncreaseHitboxBox = Tabs.Combat:AddRightGroupbox('Hitboxes')
 
 local hitboxEnabled = false
 local hitboxTargetType = "Mobs"
 local hitboxX, hitboxY, hitboxZ = 10, 10, 10
 local originalHeadSizes = {}
-local hitboxConnection
+local hitboxConnection3
 
-local hitboxToggle = combat:NewToggle("Increase Hitbox", false, function(v)
-    hitboxEnabled = v
-    if v then
-        Notif:Notify("Enabled Increase Hitbox", 5, "success")
-        hitboxConnection = RunService.Heartbeat:Connect(function()
+IncreaseHitboxBox:AddToggle('IncreaseHitbox', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Increase hitboxes',
+}):AddKeyPicker('IncreaseHitboxKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Increase Hitbox',
+    SyncToggleState = true,
+})
+
+IncreaseHitboxBox:AddDropdown('HitboxTargets', {
+    Text = 'Targets',
+    Values = {'Mobs', 'Players', 'Both'},
+    Default = 1,
+})
+IncreaseHitboxBox:AddSlider('HitboxX', { Text = 'X Size', Default = 10, Min = 1, Max = 100, Rounding = 0 })
+IncreaseHitboxBox:AddSlider('HitboxY', { Text = 'Y Size', Default = 10, Min = 1, Max = 100, Rounding = 0 })
+IncreaseHitboxBox:AddSlider('HitboxZ', { Text = 'Z Size', Default = 10, Min = 1, Max = 100, Rounding = 0 })
+
+Toggles.IncreaseHitbox:OnChanged(function()
+    hitboxEnabled = Toggles.IncreaseHitbox.Value
+    if hitboxEnabled then
+        hitboxConnection3 = RunService.Heartbeat:Connect(function()
             if not hitboxEnabled then return end
             local folders = hitboxTargetType == "Players" and {workspace.Characters}
                 or hitboxTargetType == "Mobs" and {workspace.Enemies}
@@ -858,104 +960,127 @@ local hitboxToggle = combat:NewToggle("Increase Hitbox", false, function(v)
                 for _, target in ipairs(folder:GetChildren()) do
                     local head = target:FindFirstChild("Head")
                     if head and target ~= plr.Character then
-                        if not originalHeadSizes[head] then
-                            originalHeadSizes[head] = head.Size
+                        if not originalHeadSizes[head] then 
+                            originalHeadSizes[head] = head.Size 
                         end
                         head.Size = Vector3.new(hitboxX, hitboxY, hitboxZ)
+                        head.CanCollide = false
+                        head.Massless = true
+                        head.Transparency = 0.5
                     end
                 end
             end
         end)
     else
-        if hitboxConnection then hitboxConnection:Disconnect() hitboxConnection = nil end
+        if hitboxConnection3 then hitboxConnection3:Disconnect() hitboxConnection3 = nil end
         for head, size in pairs(originalHeadSizes) do
-            if head and head.Parent then
+            if head and head.Parent then 
                 head.Size = size
+                head.CanCollide = true
+                head.Massless = false
             end
         end
         originalHeadSizes = {}
-        Notif:Notify("Disabled Increase Hitbox", 5, "error")
     end
 end)
-
-local hitboxTargetSel = combat:NewSelector("Targets", "Select targets", {"Players", "Mobs", "Both"}, function(v)
-    hitboxTargetType = v
-end)
-
-local hitboxSliderX = combat:NewSlider("X Size", "", false, "/", {min = 1, max = 100, default = 10}, function(v) hitboxX = v end)
-local hitboxSliderY = combat:NewSlider("Y Size", "", false, "/", {min = 1, max = 100, default = 10}, function(v) hitboxY = v end)
-local hitboxSliderZ = combat:NewSlider("Z Size", "", false, "/", {min = 1, max = 100, default = 10}, function(v) hitboxZ = v end)
-
-task.spawn(function()
-    while task.wait() do
-        local h = hitboxEnabled
-        hitboxTargetSel[h and "Show" or "Hide"](hitboxTargetSel)
-        hitboxSliderX[h and "Show" or "Hide"](hitboxSliderX)
-        hitboxSliderY[h and "Show" or "Hide"](hitboxSliderY)
-        hitboxSliderZ[h and "Show" or "Hide"](hitboxSliderZ)
-    end
-end)
+Options.HitboxTargets:OnChanged(function() hitboxTargetType = Options.HitboxTargets.Value end)
+Options.HitboxX:OnChanged(function() hitboxX = Options.HitboxX.Value end)
+Options.HitboxY:OnChanged(function() hitboxY = Options.HitboxY.Value end)
+Options.HitboxZ:OnChanged(function() hitboxZ = Options.HitboxZ.Value end)
 
 -- // ============================================================== Farming Tab ============================================================== \\ --
-local farm = Init:NewTab("Farming")
-local chestf = farm:NewSection("Chest Farm")
 
--- vars
+-- ===== Chest Farm =====
+local ChestFarmBox = Tabs.Farming:AddLeftGroupbox('Chest Farm')
+
 local chestFarmEnabled = false
 local horizontalSpeed = 200
 local boostEnabled = false
 local noclipEnabled = false
 local bodyVelocity
-
--- threads
-local farmThread
-local boostThread
-
--- chest stuff
 local cachedChests = {}
-local lastChestScan = 0
 local currentChest = nil
 local chestConnection = nil
 local watchChest
+local getSpawnedChests
 
-local enabled = farm:NewToggle("Enabled", false, function(value)
-    chestFarmEnabled = value
-    if value then
-        Notif:Notify("Enabled Chest Farm", 5, "success")
-        
+local function setPlayerMotion(velocity)
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = character.HumanoidRootPart
+    if not bodyVelocity or bodyVelocity.Parent ~= hrp then
+        if bodyVelocity then bodyVelocity:Destroy() end
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bodyVelocity.P = 10000
+        bodyVelocity.Parent = hrp
+    end
+    bodyVelocity.Velocity = velocity
+end
+
+local function enableNoclip()
+    noclipEnabled = true
+    coroutine.wrap(function()
+        while noclipEnabled and character do
+            RunService.Stepped:Wait()
+            if character then
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end
+        end
+    end)()
+end
+
+ChestFarmBox:AddToggle('ChestFarmEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Collects every chest available',
+}):AddKeyPicker('ChestFarmKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Chest Farm',
+    SyncToggleState = true,
+})
+
+ChestFarmBox:AddSlider('ChestFarmSpeed', {
+    Text = 'Speed',
+    Default = 200,
+    Min = 1,
+    Max = 215,
+    Rounding = 0,
+})
+
+ChestFarmBox:AddToggle('ChestFarmBoost', {
+    Text = 'Boost',
+    Default = false,
+    Tooltip = "Boosts chest farm's speed",
+})
+
+Toggles.ChestFarmEnabled:OnChanged(function()
+    chestFarmEnabled = Toggles.ChestFarmEnabled.Value
+    if chestFarmEnabled then
         task.spawn(function()
             enableNoclip()
-            
             while chestFarmEnabled do
                 local hrp = character and character:FindFirstChild("HumanoidRootPart")
-                
                 if hrp then
                     if not currentChest or not currentChest.Parent or not currentChest:FindFirstChildOfClass("TouchTransmitter") then
                         cachedChests = getSpawnedChests()
-
                         local nearest, dist = nil, math.huge
                         for _, chest in ipairs(cachedChests) do
                             local d = (hrp.Position - chest.Position).Magnitude
-                            if d < dist then
-                                dist = d
-                                nearest = chest
-                            end
+                            if d < dist then dist = d nearest = chest end
                         end
-
-                        if nearest then
-                            watchChest(nearest)
-                        end
+                        if nearest then watchChest(nearest) end
                     end
-
                     if currentChest and currentChest.Parent then
                         local delta = currentChest.Position - hrp.Position
-                        local direction = delta.Unit
-                        
                         if delta.Magnitude < 3 then
                             hrp.CFrame = currentChest.CFrame
                             setPlayerMotion(Vector3.zero)
                         else
-                            setPlayerMotion(direction * horizontalSpeed)
+                            setPlayerMotion(delta.Unit * horizontalSpeed)
                         end
                     else
                         setPlayerMotion(Vector3.zero)
@@ -965,113 +1090,93 @@ local enabled = farm:NewToggle("Enabled", false, function(value)
             end
         end)
     else
-        Notif:Notify("Disabled Chest Farm", 5, "error")
         noclipEnabled = false
-        if bodyVelocity then
-            bodyVelocity:Destroy()
-            bodyVelocity = nil
-        end
+        if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
     end
 end)
 
-local speed = farm:NewSlider("Speed", "", true, "/", {min = 1, max = 215, default = 200}, function(value)
-    horizontalSpeed = value
-    if chestFarmEnabled and bodyVelocity and bodyVelocity.Parent then
-        local currentDir = bodyVelocity.Velocity.Unit
-        bodyVelocity.Velocity = currentDir * horizontalSpeed
-    end
-end)
+Options.ChestFarmSpeed:OnChanged(function() horizontalSpeed = Options.ChestFarmSpeed.Value end)
 
-local boost = farm:NewToggle("Boost", false, function(value)
-    boostEnabled = value
-    if value then
-        Notif:Notify("Enabled Boost", 5, "success")
-        
-        boostThread = coroutine.wrap(function()
+Toggles.ChestFarmBoost:OnChanged(function()
+    boostEnabled = Toggles.ChestFarmBoost.Value
+    if boostEnabled then
+        coroutine.wrap(function()
             while boostEnabled and chestFarmEnabled and character and character:FindFirstChild("HumanoidRootPart") do
                 wait(2.67)
                 if bodyVelocity and bodyVelocity.Parent then
-                    local currentVelocity = bodyVelocity.Velocity
-                    local boostedVelocity = Vector3.new(
-                        currentVelocity.X + (currentVelocity.X > 0 and 800 or -800),
-                        0,
-                        currentVelocity.Z + (currentVelocity.Z > 0 and 800 or -800)
+                    local cv = bodyVelocity.Velocity
+                    bodyVelocity.Velocity = Vector3.new(
+                        cv.X + (cv.X > 0 and 800 or -800), 0,
+                        cv.Z + (cv.Z > 0 and 800 or -800)
                     )
-                    bodyVelocity.Velocity = boostedVelocity
                     wait(0.67)
-                    bodyVelocity.Velocity = currentVelocity
+                    bodyVelocity.Velocity = cv
                 end
             end
         end)()
-        boostThread()
-        
-    else
-        Notif:Notify("Disabled Boost", 5, "error")
     end
 end)
 
 plr.CharacterAdded:Connect(function(newChar)
     character = newChar
+    task.wait()
+    character2 = charFolder:FindFirstChild(plr.Name)
     if chestFarmEnabled then
-        wait(1)
-        enabled:Change()
-        wait(0.5)
-        enabled:Change()
+        Toggles.ChestFarmEnabled:SetValue(false)
+        task.wait(0.5)
+        Toggles.ChestFarmEnabled:SetValue(true)
     end
 end)
 
-local generalS = farm:NewSection("General")
+-- ===== Bring Mobs =====
+local BringMobsBox = Tabs.Farming:AddRightGroupbox('Bring Mobs')
+
 local bringMobsEnabled = false
 local bringBossesEnabled = false
 local bringRange = 300
-local bringMobsToggle = farm:NewToggle("Bring Mobs", false, function(v)
-    bringMobsEnabled = v
-end)
 
-local bringBossesToggle = farm:NewToggle("Bring Bosses", false, function(v)
-    bringBossesEnabled = v
-end)
+BringMobsBox:AddToggle('BringMobs', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Pull nearby mobs to you',
+}):AddKeyPicker('BringMobsKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Bring Mobs',
+    SyncToggleState = true,
+})
 
-task.spawn(function()
-    while task.wait() do
-        if bringMobsEnabled then
-            bringBossesToggle:Show()
-        else
-            bringBossesToggle:Hide()
-        end
-    end
-end)
+local BringBossesDepbox = BringMobsBox:AddDependencyBox()
+BringBossesDepbox:AddToggle('BringBosses', {
+    Text = 'Bring Bosses',
+    Default = false,
+    Tooltip = 'Also bring boss enemies',
+})
+BringBossesDepbox:SetupDependencies({ {Toggles.BringMobs, true} })
+
+Toggles.BringMobs:OnChanged(function() bringMobsEnabled = Toggles.BringMobs.Value end)
+Toggles.BringBosses:OnChanged(function() bringBossesEnabled = Toggles.BringBosses.Value end)
 
 local sethiddenproperty = sethiddenproperty or function(...) return ... end
-
 task.spawn(function()
     while task.wait(0.2) do
         if bringMobsEnabled and character and character:FindFirstChild("HumanoidRootPart") then
-            pcall(sethiddenproperty, game.Players.LocalPlayer, "SimulationRadius", math.huge)
-
+            pcall(sethiddenproperty, plr, "SimulationRadius", math.huge)
             local root = character.HumanoidRootPart
-
             for _, mob in pairs(workspace.Enemies:GetChildren()) do
                 local mRoot = mob:FindFirstChild("HumanoidRootPart")
                 local mHum = mob:FindFirstChild("Humanoid")
-
                 if mRoot and mHum and mHum.Health > 0 then
                     local dist = (mRoot.Position - root.Position).Magnitude
                     if dist <= bringRange then
-
                         local isBoss = mob:GetAttribute("IsBoss") == true
                         if not isBoss or (isBoss and bringBossesEnabled) then
-                            local targetPos = root.Position + Vector3.new(0, 0, 10)
-                            local targetCFrame = CFrame.lookAt(targetPos, targetPos + Vector3.new(0, 1, 0))
-                            
-                            mRoot.CFrame = targetCFrame
+                            local targetPos = root.Position + Vector3.new(0, 7, 0)
+                            mRoot.CFrame = CFrame.lookAt(targetPos, targetPos + Vector3.new(0, 1, 0))
                             mRoot.CanCollide = false
-
                             mRoot.AssemblyLinearVelocity = Vector3.zero
                             mRoot.AssemblyAngularVelocity = Vector3.zero
-
-                            mHum:ChangeState(11)
-                            mHum:ChangeState(14)
                             mHum:ChangeState(Enum.HumanoidStateType.Running)
                         end
                     end
@@ -1081,147 +1186,241 @@ task.spawn(function()
     end
 end)
 
-local questS = farm:NewSection("Quests")
-local currentSeaQuests = {}
+-- ===== Quests =====
+local QuestBox = Tabs.Farming:AddRightGroupbox('Quests')
 
+local currentSeaQuests = {}
 for name, data in pairs(quests) do
-    if (First_Sea and data[3] == "First") or 
-       (Second_Sea and data[3] == "Second") or 
-       (Third_Sea and data[3] == "Third") then
+    if (First_Sea and data[3] == "First") or (Second_Sea and data[3] == "Second") or (Third_Sea and data[3] == "Third") then
         currentSeaQuests[name] = data
     end
 end
 
 local questList = {}
-for name, _ in pairs(currentSeaQuests) do table.insert(questList, name) end
+for name in pairs(currentSeaQuests) do table.insert(questList, name) end
 table.sort(questList, function(a, b)
-    local lvA = tonumber(a:match("%d+")) or 0
-    local lvB = tonumber(b:match("%d+")) or 0
-    return lvA < lvB
+    return (tonumber(a:match("%d+")) or 0) < (tonumber(b:match("%d+")) or 0)
 end)
 
 local selectedQuestData = nil
+QuestBox:AddDropdown('QuestSelect', {
+    Text = 'Select Quest',
+    Values = questList,
+    Default = 1,
+    Tooltip = 'Choose a quest to start',
+})
+Options.QuestSelect:OnChanged(function() selectedQuestData = currentSeaQuests[Options.QuestSelect.Value] end)
+selectedQuestData = currentSeaQuests[questList[1]]
 
-farm:NewSelector("Select Quest", "-", questList, function(current)
-    selectedQuestData = currentSeaQuests[current]
-end)
-
-farm:NewButton("Start Quest", function()
-    if selectedQuestData then
-        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", selectedQuestData[1], selectedQuestData[2])
-        Notif:Notify("Started Quest!", 6, "success")
-    else
-        Notif:Notify("Select a quest first!", 6, "error")
-    end
-end)
+QuestBox:AddButton({
+    Text = 'Start Quest',
+    Tooltip = 'Accept selected quest',
+    Func = function()
+        if selectedQuestData then
+            CommF:InvokeServer("StartQuest", selectedQuestData[1], selectedQuestData[2])
+            Library:Notify("Started Quest!", 5)
+        else
+            Library:Notify("Select a quest first!", 5)
+        end
+    end,
+})
 
 -- // ============================================================== Movement Tab ============================================================== \\ --
-local movement = Init:NewTab("Movement")
+
+-- ===== Dash Distance =====
+local DashBox = Tabs.Movement:AddLeftGroupbox('Dash Distance')
 
 local dashEnabled = false
 local dashDistance = 100
 local defaultDashLength = 0
 
-local dashToggle = movement:NewToggle("Dash Distance", false, function(v)
-    dashEnabled = v
-    if v then
-        local char2 = charFolder:FindFirstChild(plr.Name)
-        if char2 then
-            defaultDashLength = char2:GetAttribute("DashLength") or 0
-        end
-        Notif:Notify("Enabled Dash Distance", 5, "success")
+DashBox:AddToggle('DashDistance', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Increases dash distance',
+}):AddKeyPicker('DashDistanceKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Dash Distance',
+    SyncToggleState = true,
+})
+
+DashBox:AddSlider('DashDistanceSlider', {
+    Text = 'Distance',
+    Default = 100,
+    Min = 0,
+    Max = 500,
+    Rounding = 0,
+})
+
+Toggles.DashDistance:OnChanged(function()
+    dashEnabled = Toggles.DashDistance.Value
+    local c2 = charFolder:FindFirstChild(plr.Name)
+    if dashEnabled then
+        if c2 then defaultDashLength = c2:GetAttribute("DashLength") or 0 end
     else
-        local char2 = charFolder:FindFirstChild(plr.Name)
-        if char2 then
-            char2:SetAttribute("DashLength", defaultDashLength)
-        end
-        Notif:Notify("Disabled Dash Distance", 5, "error")
+        if c2 then c2:SetAttribute("DashLength", defaultDashLength) end
     end
 end)
-
-local dashSlider = movement:NewSlider("Distance", "", false, "/", {min = 0, max = 500, default = 100}, function(v)
-    dashDistance = v
+Options.DashDistanceSlider:OnChanged(function()
+    dashDistance = Options.DashDistanceSlider.Value
     if dashEnabled then
-        local char2 = charFolder:FindFirstChild(plr.Name)
-        if char2 then
-            char2:SetAttribute("DashLength", dashDistance)
-        end
+        local c2 = charFolder:FindFirstChild(plr.Name)
+        if c2 then c2:SetAttribute("DashLength", dashDistance) end
     end
 end)
 
 task.spawn(function()
     while task.wait() do
         if dashEnabled then
-            local char2 = charFolder:FindFirstChild(plr.Name)
-            if char2 then
-                char2:SetAttribute("DashLength", dashDistance)
-            end
+            local c2 = charFolder:FindFirstChild(plr.Name)
+            if c2 then c2:SetAttribute("DashLength", dashDistance) end
         end
-        dashSlider[dashEnabled and "Show" or "Hide"](dashSlider)
     end
 end)
+
+-- ===== Speed Boost =====
+local SpeedBox = Tabs.Movement:AddLeftGroupbox('Speed Boost')
 
 local speedBoostEnabled = false
-local speedBoostValue = 1
-local defaultSpeedMult = 0
+local speedBoostValue = 2
+local defaultSpeedMult = 1
 
-local speedBoostToggle = movement:NewToggle("Speed Boost", false, function(v)
-    speedBoostEnabled = v
-    if v then
-        local char2 = charFolder:FindFirstChild(plr.Name)
-        if char2 then
-            defaultSpeedMult = char2:GetAttribute("SpeedMultiplier") or 1
-        end
-        Notif:Notify("Enabled Speed Boost", 5, "success")
+SpeedBox:AddToggle('SpeedBoost', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Increases movement speed',
+}):AddKeyPicker('SpeedBoostKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Speed Boost',
+    SyncToggleState = true,
+})
+
+SpeedBox:AddSlider('SpeedBoostSlider', {
+    Text = 'Speed Multiplier',
+    Default = 2,
+    Min = 1,
+    Max = 10,
+    Rounding = 1,
+    Suffix = 'x',
+})
+
+Toggles.SpeedBoost:OnChanged(function()
+    speedBoostEnabled = Toggles.SpeedBoost.Value
+    local c2 = charFolder:FindFirstChild(plr.Name)
+    if speedBoostEnabled then
+        if c2 then defaultSpeedMult = c2:GetAttribute("SpeedMultiplier") or 1 end
     else
-        local char2 = charFolder:FindFirstChild(plr.Name)
-        if char2 then
-            char2:SetAttribute("SpeedMultiplier", defaultSpeedMult)
-        end
-        Notif:Notify("Disabled Speed Boost", 5, "error")
+        if c2 then c2:SetAttribute("SpeedMultiplier", defaultSpeedMult) end
     end
 end)
-
-local speedBoostSlider = movement:NewSlider("Speed Multiplier", "x", false, "/", {min = 1, max = 10, default = 2}, function(v)
-    speedBoostValue = v
+Options.SpeedBoostSlider:OnChanged(function()
+    speedBoostValue = Options.SpeedBoostSlider.Value
     if speedBoostEnabled then
-        local char2 = charFolder:FindFirstChild(plr.Name)
-        if char2 then
-            char2:SetAttribute("SpeedMultiplier", speedBoostValue)
-        end
+        local c2 = charFolder:FindFirstChild(plr.Name)
+        if c2 then c2:SetAttribute("SpeedMultiplier", speedBoostValue) end
     end
 end)
 
 task.spawn(function()
     while task.wait() do
         if speedBoostEnabled then
-            local char2 = charFolder:FindFirstChild(plr.Name)
-            if char2 then
-                char2:SetAttribute("SpeedMultiplier", speedBoostValue)
-            end
+            local c2 = charFolder:FindFirstChild(plr.Name)
+            if c2 then c2:SetAttribute("SpeedMultiplier", speedBoostValue) end
         end
-        speedBoostSlider[speedBoostEnabled and "Show" or "Hide"](speedBoostSlider)
     end
 end)
 
+-- ===== SlyPort =====
+local SlyPortBox = Tabs.Movement:AddLeftGroupbox('SlyPort')
+
+local slyPortEnabled = false
+
+local function getNearestPlayer()
+    local nearest = nil
+    local nearestDist = math.huge
+    local charactersFolder = workspace:FindFirstChild("Characters")
+    if not charactersFolder then return nil end
+    
+    for _, target in ipairs(charactersFolder:GetChildren()) do
+        if target ~= plr.Character then
+            local hrp = target:FindFirstChild("HumanoidRootPart")
+            local hum = target:FindFirstChild("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local dist = plr:DistanceFromCharacter(hrp.Position)
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearest = target
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function slyPort()
+
+end
+
+SlyPortBox:AddToggle('SlyPortEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'look behind you...',
+}):AddKeyPicker('SlyPortKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'SlyPort',
+    SyncToggleState = true,
+})
+
+Toggles.SlyPortEnabled:OnChanged(function()
+    if Toggles.SlyPortEnabled.Value then
+        local char = plr.Character
+        if not char then return end
+        
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        
+        local target = getNearestPlayer()
+        if not target then 
+            Library:Notify("No nearby players found!", 3)
+            Toggles.SlyPortEnabled:SetValue(false)
+            return 
+        end
+        
+        local targetHrp = target:FindFirstChild("HumanoidRootPart")
+        if not targetHrp then 
+            Toggles.SlyPortEnabled:SetValue(false)
+            return 
+        end
+        
+        local offset = targetHrp.CFrame.LookVector * -2
+        local newPos = targetHrp.Position + offset + Vector3.new(0, 0, 0)
+        
+        hrp.CFrame = CFrame.new(newPos)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        
+        Library:Notify("Teleported behind "..target.Name, 3)
+        Toggles.SlyPortEnabled:SetValue(false)
+    end
+end)
+
+-- ===== Boat Fly =====
+local BoatFlyBox = Tabs.Movement:AddRightGroupbox('Boat Fly')
+
 local boatFlyEnabled = false
-local boatFlyHSpeed = 50
-local boatFlyVSpeed = 30
+local boatFlyHSpeed = 100
+local boatFlyVSpeed = 100
 local boatNoclipEnabled = false
-local boatFlyKey = Enum.KeyCode.G
-
-local boatCONTROL = {F = 0, B = 0, L = 0, R = 0, U = 0, D = 0}
-
-local boatBV = nil
-local boatBG = nil
-local boatFlyConnection = nil
-local flyKeyDown = nil
-local flyKeyUp = nil
-local seatWeldConnection = nil
-
-local currentSeat = nil
-local currentBoat = nil
-local boatRoot = nil
+local boatCONTROL = {F=0,B=0,L=0,R=0,U=0,D=0}
+local boatBV, boatBG = nil, nil
+local boatFlyConnection, flyKeyDown, flyKeyUp, seatWeldConnection = nil, nil, nil, nil
+local currentSeat, currentBoat, boatRoot = nil, nil, nil
 
 local function getPlayerSeatAndBoat()
     local boatsFolder = workspace:FindFirstChild("Boats")
@@ -1230,17 +1429,12 @@ local function getPlayerSeatAndBoat()
     if not char then return nil, nil end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return nil, nil end
-
     for _, boat in ipairs(boatsFolder:GetChildren()) do
         for _, v in ipairs(boat:GetDescendants()) do
-            if v:IsA("VehicleSeat") and v.Occupant == hum then
-                return v, boat
-            end
+            if v:IsA("VehicleSeat") and v.Occupant == hum then return v, boat end
             if v:IsA("Seat") then
                 local sw = v:FindFirstChild("SeatWeld")
-                if sw and sw.Part1 and sw.Part1:IsDescendantOf(char) then
-                    return v, boat
-                end
+                if sw and sw.Part1 and sw.Part1:IsDescendantOf(char) then return v, boat end
             end
         end
     end
@@ -1249,29 +1443,23 @@ end
 
 local function getBoatRoot(boat)
     for _, part in ipairs(boat:GetDescendants()) do
-        if part:IsA("BasePart") and not part:IsA("Seat") and not part:IsA("VehicleSeat") then
-            return part
-        end
+        if part:IsA("BasePart") and not part:IsA("Seat") and not part:IsA("VehicleSeat") then return part end
     end
     return currentSeat
 end
 
 local function keepSeated()
     if not currentSeat or not plr.Character then return end
-    
     local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-    if hum and hum.Sit == false then
-        hum.Sit = true
-    end
-    
+    if hum and hum.Sit == false then hum.Sit = true end
     local sw = currentSeat:FindFirstChild("SeatWeld")
     if not sw then
         sw = Instance.new("Weld")
         sw.Name = "SeatWeld"
         sw.Part0 = currentSeat
         sw.Part1 = plr.Character:FindFirstChild("HumanoidRootPart")
-        sw.C0 = CFrame.new(0, 0, 0)
-        sw.C1 = CFrame.new(0, 0, 0)
+        sw.C0 = CFrame.new(0,0,0)
+        sw.C1 = CFrame.new(0,0,0)
         sw.Parent = currentSeat
     else
         sw.Part1 = plr.Character:FindFirstChild("HumanoidRootPart")
@@ -1281,69 +1469,47 @@ end
 local function stopBoatFly()
     if boatBV and boatBV.Parent then boatBV:Destroy() end
     if boatBG and boatBG.Parent then boatBG:Destroy() end
-    boatBV = nil
-    boatBG = nil
-    
-    if boatFlyConnection then 
-        boatFlyConnection:Disconnect()
-        boatFlyConnection = nil
-    end
-    if flyKeyDown then 
-        flyKeyDown:Disconnect()
-        flyKeyDown = nil
-    end
-    if flyKeyUp then 
-        flyKeyUp:Disconnect()
-        flyKeyUp = nil
-    end
-    if seatWeldConnection then
-        seatWeldConnection:Disconnect()
-        seatWeldConnection = nil
-    end
-    
-    boatCONTROL = {F = 0, B = 0, L = 0, R = 0, U = 0, D = 0}
-    currentSeat = nil
-    currentBoat = nil
-    boatRoot = nil
+    boatBV, boatBG = nil, nil
+    if boatFlyConnection then boatFlyConnection:Disconnect() boatFlyConnection = nil end
+    if flyKeyDown then flyKeyDown:Disconnect() flyKeyDown = nil end
+    if flyKeyUp then flyKeyUp:Disconnect() flyKeyUp = nil end
+    if seatWeldConnection then seatWeldConnection:Disconnect() seatWeldConnection = nil end
+    boatCONTROL = {F=0,B=0,L=0,R=0,U=0,D=0}
+    currentSeat, currentBoat, boatRoot = nil, nil, nil
 end
 
 local function startBoatFly()
     stopBoatFly()
-    
     currentSeat, currentBoat = getPlayerSeatAndBoat()
     if not currentSeat or not currentBoat then
-        if Notif then Notif:Notify("Not sitting in a boat!", 5, "error") end
+        Library:Notify("Not sitting in a boat!", 5)
         boatFlyEnabled = false
+        Toggles.BoatFly:SetValue(false)
         return
     end
-
     boatRoot = getBoatRoot(currentBoat)
     if not boatRoot then
-        if Notif then Notif:Notify("Could not find boat root!", 5, "error") end
+        Library:Notify("Could not find boat root!", 5)
         boatFlyEnabled = false
+        Toggles.BoatFly:SetValue(false)
         return
     end
-
     if currentSeat:IsA("VehicleSeat") then
         currentSeat.HeadsUpDisplay = false
         workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
     end
-    
     boatBV = Instance.new("BodyVelocity")
-    boatBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    boatBV.MaxForce = Vector3.new(9e9,9e9,9e9)
     boatBV.Velocity = Vector3.zero
     boatBV.Parent = boatRoot
-    
     boatBG = Instance.new("BodyGyro")
-    boatBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    boatBG.MaxTorque = Vector3.new(9e9,9e9,9e9)
     boatBG.P = 5000
     boatBG.D = 400
     boatBG.CFrame = boatRoot.CFrame
     boatBG.Parent = boatRoot
-
     keepSeated()
     seatWeldConnection = RunService.Heartbeat:Connect(keepSeated)
-
     flyKeyDown = UserInputService.InputBegan:Connect(function(input, processed)
         if processed or not boatFlyEnabled then return end
         if input.KeyCode == Enum.KeyCode.W then boatCONTROL.F = 1
@@ -1353,7 +1519,6 @@ local function startBoatFly()
         elseif input.KeyCode == Enum.KeyCode.C then boatCONTROL.U = 1
         elseif input.KeyCode == Enum.KeyCode.V then boatCONTROL.D = 1 end
     end)
-
     flyKeyUp = UserInputService.InputEnded:Connect(function(input, processed)
         if processed or not boatFlyEnabled then return end
         if input.KeyCode == Enum.KeyCode.W then boatCONTROL.F = 0
@@ -1363,239 +1528,87 @@ local function startBoatFly()
         elseif input.KeyCode == Enum.KeyCode.C then boatCONTROL.U = 0
         elseif input.KeyCode == Enum.KeyCode.V then boatCONTROL.D = 0 end
     end)
-
     boatFlyConnection = RunService.Heartbeat:Connect(function()
         if not boatFlyEnabled then return end
-        
         local seat, boat = getPlayerSeatAndBoat()
         if not seat or not boat then
             stopBoatFly()
             boatFlyEnabled = false
-            if Notif then Notif:Notify("Left boat, disabling fly", 3, "error") end
+            Library:Notify("Left boat, disabling fly", 3)
             return
         end
-        
         if boat ~= currentBoat then
-            currentBoat = boat
-            currentSeat = seat
-            boatRoot = getBoatRoot(boat)
+            currentBoat = boat currentSeat = seat boatRoot = getBoatRoot(boat)
             if boatBV then boatBV.Parent = boatRoot end
             if boatBG then boatBG.Parent = boatRoot end
         end
-        
         if boatNoclipEnabled and currentBoat then
             for _, part in ipairs(currentBoat:GetDescendants()) do
                 if part:IsA("BasePart") then part.CanCollide = false end
             end
         end
-        
-        local camera = workspace.CurrentCamera
+        local cam = workspace.CurrentCamera
         local moveDir = Vector3.zero
-        
-        if boatCONTROL.F == 1 then moveDir = moveDir + camera.CFrame.LookVector end
-        if boatCONTROL.B == 1 then moveDir = moveDir - camera.CFrame.LookVector end
-        if boatCONTROL.R == 1 then moveDir = moveDir + camera.CFrame.RightVector end
-        if boatCONTROL.L == 1 then moveDir = moveDir - camera.CFrame.RightVector end
-        
-        local horizontalMove = Vector3.new(moveDir.X, 0, moveDir.Z)
-        if horizontalMove.Magnitude > 0 then
-            horizontalMove = horizontalMove.Unit * boatFlyHSpeed
-        end
-
-        local verticalVel = 0
-        if boatCONTROL.U == 1 then verticalVel = boatFlyVSpeed end
-        if boatCONTROL.D == 1 then verticalVel = -boatFlyVSpeed end
-        
-        boatBV.Velocity = horizontalMove + Vector3.new(0, verticalVel, 0)
-
-        local look = camera.CFrame.LookVector
+        if boatCONTROL.F == 1 then moveDir = moveDir + cam.CFrame.LookVector end
+        if boatCONTROL.B == 1 then moveDir = moveDir - cam.CFrame.LookVector end
+        if boatCONTROL.R == 1 then moveDir = moveDir + cam.CFrame.RightVector end
+        if boatCONTROL.L == 1 then moveDir = moveDir - cam.CFrame.RightVector end
+        local hMove = Vector3.new(moveDir.X, 0, moveDir.Z)
+        if hMove.Magnitude > 0 then hMove = hMove.Unit * boatFlyHSpeed end
+        local vVel = 0
+        if boatCONTROL.U == 1 then vVel = boatFlyVSpeed end
+        if boatCONTROL.D == 1 then vVel = -boatFlyVSpeed end
+        boatBV.Velocity = hMove + Vector3.new(0, vVel, 0)
+        local look = cam.CFrame.LookVector
         local flatLook = Vector3.new(look.X, 0, look.Z).Unit
-
-        if horizontalMove.Magnitude > 0 then
-            boatBG.CFrame = CFrame.lookAt(Vector3.zero, horizontalMove)
+        if hMove.Magnitude > 0 then
+            boatBG.CFrame = CFrame.lookAt(Vector3.zero, hMove)
         else
             boatBG.CFrame = CFrame.lookAt(Vector3.zero, flatLook)
         end
     end)
 end
 
-if movement then
-    local boatFlyToggle = movement:NewToggle("Boat Fly", false, function(v)
-        boatFlyEnabled = v
-        if v then
-            task.spawn(function()
-                wait(0.1)
-                startBoatFly()
-            end)
-            if Notif then Notif:Notify("Enabled Boat Fly", 5, "success") end
-        else
-            stopBoatFly()
-            if Notif then Notif:Notify("Disabled Boat Fly", 5, "error") end
-        end
-    end)
-    boatFlyToggle:AddKeybind(boatFlyKey)
+BoatFlyBox:AddToggle('BoatFly', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Fly. but on a boat',
+}):AddKeyPicker('BoatFlyKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Boat Fly',
+    SyncToggleState = true,
+})
 
-    local boatHSpeedSlider = movement:NewSlider("Horizontal Speed", "", false, "/", {min = 10, max = 800, default = 100}, function(v)
-        boatFlyHSpeed = v
-    end)
+BoatFlyBox:AddSlider('BoatFlyHSpeed', { Text = 'Horizontal Speed', Default = 100, Min = 10, Max = 800, Rounding = 0 })
+BoatFlyBox:AddSlider('BoatFlyVSpeed', { Text = 'Vertical Speed', Default = 100, Min = 5, Max = 800, Rounding = 0 })
+BoatFlyBox:AddToggle('BoatNoclip', { Text = 'Boat NoClip', Default = false })
+BoatFlyBox:AddLabel('Hold [C] to go up')
+BoatFlyBox:AddLabel('Hold [V] to go down')
 
-    local boatVSpeedSlider = movement:NewSlider("Vertical Speed", "", false, "/", {min = 5, max = 800, default = 100}, function(v)
-        boatFlyVSpeed = v
-    end)
-
-    local boatNoclipToggle = movement:NewToggle("Boat NoClip", false, function(v)
-        boatNoclipEnabled = v
-    end)
-
-    local boatFlyLabel1 = movement:NewLabel("Hold [C] to go up")
-    local boatFlyLabel2 = movement:NewLabel("Hold [V] to go down")
-    
-    boatHSpeedSlider:Hide()
-    boatVSpeedSlider:Hide()
-    boatNoclipToggle:Hide()
-    boatFlyLabel1:Hide()
-    boatFlyLabel2:Hide()
-    
-    task.spawn(function()
-        while task.wait() do
-            if boatFlyEnabled then
-                boatHSpeedSlider:Show()
-                boatVSpeedSlider:Show()
-                boatNoclipToggle:Show()
-                boatFlyLabel1:Show()
-                boatFlyLabel2:Show()
-            else
-                boatHSpeedSlider:Hide()
-                boatVSpeedSlider:Hide()
-                boatNoclipToggle:Hide()
-                boatFlyLabel1:Hide()
-                boatFlyLabel2:Hide()
-            end
-        end
-    end)
-end
-
+Toggles.BoatFly:OnChanged(function()
+    boatFlyEnabled = Toggles.BoatFly.Value
+    if boatFlyEnabled then
+        task.spawn(function() wait(0.1) startBoatFly() end)
+    else
+        stopBoatFly()
+    end
+end)
+Options.BoatFlyHSpeed:OnChanged(function() boatFlyHSpeed = Options.BoatFlyHSpeed.Value end)
+Options.BoatFlyVSpeed:OnChanged(function() boatFlyVSpeed = Options.BoatFlyVSpeed.Value end)
+Toggles.BoatNoclip:OnChanged(function() boatNoclipEnabled = Toggles.BoatNoclip.Value end)
 
 -- // ============================================================== Player Tab ============================================================== \\ --
-local player = Init:NewTab("Player")
 
-local infEnergyEnabled = false
-local energyConnection
-local defaultMax, defaultMin, defaultVal = 0, 0, 0
-local infEnergy = player:NewToggle("Infinite Energy", false, function(value)
-    infEnergyEnabled = value
-    
-    local function getEnergy()
-        local char = charFolder:FindFirstChild(plr.Name)
-        return char and char:FindFirstChild("Energy")
-    end
-
-    if value then
-        Notif:Notify("Enabled Infinite Energy", 5, "success")
-        local energy = getEnergy()
-        if energy and energy:IsA("IntConstrainedValue") then
-            defaultVal, defaultMax, defaultMin = energy.Value, energy.MaxValue, energy.MinValue
-        end
-
-        energyConnection = game:GetService("RunService").Heartbeat:Connect(function()
-            if not infEnergyEnabled then return end
-            local e = getEnergy()
-            if e then
-                e.MaxValue = 99999999
-                e.Value = 99999999
-            end
-        end)
-    else
-        Notif:Notify("Disabled Infinite Energy", 5, "error")
-        if energyConnection then energyConnection:Disconnect() end
-        local e = getEnergy()
-        if e then
-            e.MaxValue = defaultMax
-            e.Value = defaultVal
-        end
-    end
-end)
-
-local soruEnabled = false
-local soruConnection
-local defaultCooldown = 0
-local noSoru = player:NewToggle("No Soru Cooldown", false, function(value)
-    soruEnabled = value
-    
-    if value then
-        if character2 then
-            local soru = character2:GetAttribute("FlashstepCooldown")
-            if soru then
-                defaultCooldown = soru
-            end
-        end
-
-        Notif:Notify("Enabled No Soru Cooldown", 5, "success")
-        
-        soruConnection = game:GetService("RunService").Heartbeat:Connect(function()
-            if not soruEnabled then 
-                if soruConnection then soruConnection:Disconnect() end
-                return 
-            end
-
-            if charFolder then
-                local character2 = charFolder:FindFirstChild(plr.Name)
-                if character2 then
-                    character2:SetAttribute("FlashstepCooldown", 1)
-                end
-            end
-        end)
-    else
-        if soruConnection then
-            soruConnection:Disconnect()
-            soruConnection = nil
-        end
-        
-        if character2 then
-            character2:SetAttribute("FlashstepCooldown", defaultCooldown)
-        end
-        
-        Notif:Notify("Disabled No Soru Cooldown", 5, "error")
-    end
-end)
-
-local originalChestSizes = {}
-local increaseRangeState = false
-player:NewToggle("Increase Chest Opening Range", false, function(v)
-    increaseRangeState = v
-
-    task.wait()
-    if increaseRangeState then
-        local mapFolder = workspace:FindFirstChild("Map")
-        if mapFolder then
-            for _, obj in ipairs(mapFolder:GetDescendants()) do
-                if obj:IsA("BasePart") and (obj.Name == "Chest1" or obj.Name == "Chest2" or obj.Name == "Chest3") then
-                    if not originalChestSizes[obj] then
-                        originalChestSizes[obj] = obj.Size
-                    end
-
-                    if obj.Size.X ~= 100 then
-                        obj.Size = Vector3.new(100,100,100)
-                    end
-                end
-            end
-        end
-    end    
-
-    if not v then
-        for chest, size in pairs(originalChestSizes) do
-            if chest and chest.Parent then
-                chest.Size = size
-            end
-        end
-        table.clear(originalChestSizes)
-    end
-end)
+-- ===== Save Energy =====
+local SaveEnergyBox = Tabs.Player:AddLeftGroupbox('Save Energy')
 
 local saveEnergyEnabled = false
 local blockDashEnergy = false
 local blockGeppoEnergy = false
-local commEHook = nil
+local blockDJEnergy = false
+
 task.spawn(function()
     local gg = getrawmetatable(game)
     local old = gg.__namecall
@@ -1606,12 +1619,12 @@ task.spawn(function()
         if method == "FireServer" and rawequal(self, CommE) then
             local args = table.pack(...)
             if args[1] == "Dodge" then
-                if blockDashEnergy and args[2] == nil and type(args[3]) == "number" then
-                    return
-                end
-                if blockGeppoEnergy and args[2] == "Geppo" then
-                    return
-                end
+                if blockDashEnergy and args[2] == nil and type(args[3]) == "number" then return end
+                if blockGeppoEnergy and args[2] == "Geppo" then return end
+            end
+            
+            if args[1] == "DoubleJump" then
+                if blockDJEnergy and args[2] == "false" then return end
             end
         end
         return prev(self, ...)
@@ -1619,107 +1632,235 @@ task.spawn(function()
     setreadonly(gg, true)
 end)
 
-local saveEnergyToggle = player:NewToggle("Save Energy", false, function(v)
-    saveEnergyEnabled = v
-    if v then
-        Notif:Notify("Enabled Save Energy", 5, "success")
+SaveEnergyBox:AddToggle('SaveEnergy', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Blocks certain actions from consuming your energy',
+}):AddKeyPicker('SaveEnergyKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Save Energy',
+    SyncToggleState = true,
+})
+
+local SaveEnergyDepbox = SaveEnergyBox:AddDependencyBox()
+SaveEnergyDepbox:AddToggle('BlockDashEnergy', { Text = 'Dashing', Default = false })
+SaveEnergyDepbox:AddToggle('BlockDJEnergy', { Text = 'Double Jump', Default = false })
+SaveEnergyDepbox:AddToggle('BlockGeppoEnergy', { Text = 'Geppos', Default = false })
+SaveEnergyDepbox:SetupDependencies({ {Toggles.SaveEnergy, true} })
+
+Toggles.SaveEnergy:OnChanged(function()
+    saveEnergyEnabled = Toggles.SaveEnergy.Value
+    if not saveEnergyEnabled then blockDashEnergy = false blockGeppoEnergy = false blockDJEnergy = false end
+end)
+Toggles.BlockDashEnergy:OnChanged(function() blockDashEnergy = Toggles.BlockDashEnergy.Value end)
+Toggles.BlockGeppoEnergy:OnChanged(function() blockGeppoEnergy = Toggles.BlockGeppoEnergy.Value end)
+Toggles.BlockDJEnergy:OnChanged(function() blockDJEnergy = Toggles.BlockDJEnergy.Value end)
+
+-- ===== No Soru Cooldown =====
+local NoSoruBox = Tabs.Player:AddLeftGroupbox('No Soru Cooldown')
+
+local soruEnabled = false
+local soruConnection
+local defaultCooldown = 0
+
+NoSoruBox:AddToggle('NoSoru', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Removes Soru cooldown',
+}):AddKeyPicker('NoSoruKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'No Soru Cooldown',
+    SyncToggleState = true,
+})
+
+Toggles.NoSoru:OnChanged(function()
+    soruEnabled = Toggles.NoSoru.Value
+    if soruEnabled then
+        if character2 then
+            local s = character2:GetAttribute("FlashstepCooldown")
+            if s then defaultCooldown = s end
+        end
+        soruConnection = RunService.Heartbeat:Connect(function()
+            if not soruEnabled then if soruConnection then soruConnection:Disconnect() end return end
+            local c2 = charFolder:FindFirstChild(plr.Name)
+            if c2 then c2:SetAttribute("FlashstepCooldown", 1) end
+        end)
     else
-        blockDashEnergy = false
-        blockGeppoEnergy = false
-        Notif:Notify("Disabled Save Energy", 5, "error")
+        if soruConnection then soruConnection:Disconnect() soruConnection = nil end
+        if character2 then character2:SetAttribute("FlashstepCooldown", defaultCooldown) end
     end
 end)
 
-local blockDashToggle = player:NewToggle("Stop Dash From Consuming Energy", false, function(v)
-    blockDashEnergy = v
-end)
+-- ===== Chest Reach =====
+local ChestRangeBox = Tabs.Player:AddRightGroupbox('Chest Reach')
 
-local blockGeppoToggle = player:NewToggle("Stop Geppo From Consuming Energy", false, function(v)
-    blockGeppoEnergy = v
-end)
+local originalChestSizes = {}
+ChestRangeBox:AddToggle('ChestRange', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Open chests from far away',
+}):AddKeyPicker('ChestRangeKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Chest Range',
+    SyncToggleState = true,
+})
 
-task.spawn(function()
-    while task.wait() do
-        local s = saveEnergyEnabled
-        blockDashToggle[s and "Show" or "Hide"](blockDashToggle)
-        blockGeppoToggle[s and "Show" or "Hide"](blockGeppoToggle)
+Toggles.ChestRange:OnChanged(function()
+    local v = Toggles.ChestRange.Value
+    task.wait()
+    if v then
+        local mapFolder = workspace:FindFirstChild("Map")
+        if mapFolder then
+            for _, obj in ipairs(mapFolder:GetDescendants()) do
+                if obj:IsA("BasePart") and (obj.Name == "Chest1" or obj.Name == "Chest2" or obj.Name == "Chest3") then
+                    if not originalChestSizes[obj] then originalChestSizes[obj] = obj.Size end
+                    if obj.Size.X ~= 100 then obj.Size = Vector3.new(100,100,100) end
+                end
+            end
+        end
+    else
+        for chest, size in pairs(originalChestSizes) do
+            if chest and chest.Parent then chest.Size = size end
+        end
+        table.clear(originalChestSizes)
     end
 end)
+
+-- ===== Unbreakable =====
+local UnbreakableBox = Tabs.Player:AddRightGroupbox('Unbreakable')
 
 local unbreakableEnabled = false
 local defaultUnbreakable = nil
 
-local unbreakableToggle = player:NewToggle("Unbreakable", false, function(v)
-    unbreakableEnabled = v
-    if v then
-        local char2 = charFolder:FindFirstChild(plr.Name)
-        if char2 then
-            defaultUnbreakable = char2:GetAttribute("UnbreakableAll")
-            char2:SetAttribute("UnbreakableAll", true)
-        end
-        Notif:Notify("Enabled Unbreakable", 5, "success")
+UnbreakableBox:AddToggle('Unbreakable', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Prevent your skills from getting interupted',
+}):AddKeyPicker('UnbreakableKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Unbreakable',
+    SyncToggleState = true,
+})
+
+Toggles.Unbreakable:OnChanged(function()
+    unbreakableEnabled = Toggles.Unbreakable.Value
+    local c2 = charFolder:FindFirstChild(plr.Name)
+    if unbreakableEnabled then
+        if c2 then defaultUnbreakable = c2:GetAttribute("UnbreakableAll") c2:SetAttribute("UnbreakableAll", true) end
     else
-        local char2 = charFolder:FindFirstChild(plr.Name)
-        if char2 then
-            char2:SetAttribute("UnbreakableAll", defaultUnbreakable)
-        end
-        Notif:Notify("Disabled Unbreakable", 5, "error")
+        if c2 then c2:SetAttribute("UnbreakableAll", defaultUnbreakable) end
     end
 end)
 
 task.spawn(function()
     while task.wait() do
         if unbreakableEnabled then
-            local char2 = charFolder:FindFirstChild(plr.Name)
-            if char2 then
-                char2:SetAttribute("UnbreakableAll", true)
-            end
+            local c2 = charFolder:FindFirstChild(plr.Name)
+            if c2 then c2:SetAttribute("UnbreakableAll", true) end
         end
     end
 end)
 
 -- // ============================================================== Misc Tab ============================================================== \\ --
-local misc = Init:NewTab("Misc")
-local shopS = misc:NewSection("Shop")
 
-misc:NewButton("Roll Fruit", function()
-    CommF:InvokeServer("Cousin", "Buy", "DLCBoxData")
-end)
+-- ===== Shop =====
+local ShopBox = Tabs.Misc:AddLeftGroupbox('Shop')
+ShopBox:AddDivider()
 
-local serverS = misc:NewSection("Server")
-misc:NewButton("Server Hop (Normal)", function()
-    local servers = getServers(game.PlaceId)
-    if #servers == 0 then return end
+ShopBox:AddLabel("Fighting Styles")
 
-    local chosen = servers[math.random(1, #servers)]
-    TeleportService:TeleportToPlaceInstance(game.PlaceId, chosen.id)
-end)
+ShopBox:AddLabel("Misc")
+ShopBox:AddButton({
+    Text = 'Roll Fruit',
+    Tooltip = 'gambling $$$',
+    Func = function()
+        CommF:InvokeServer("Cousin", "Buy", "DLCBoxData")
+    end,
+})
 
-misc:NewButton("Server Hop (Lowest)", function()
-    local servers = getServers(game.PlaceId)
-    if #servers == 0 then return end
+-- ===== Server =====
+local ServerBox = Tabs.Misc:AddRightGroupbox('Server')
 
-    table.sort(servers, function(a, b)
-        return a.playing < b.playing
-    end)
+getServers = function(placeId)
+    local servers = {}
+    local cursor = ""
+    repeat
+        local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"..cursor
+        local success, res = pcall(function() return request({Url = url, Method = "GET"}) end)
+        if success and res and res.Body then
+            local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
+            if ok and data and data.data then
+                for _, server in ipairs(data.data) do
+                    if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                        table.insert(servers, server)
+                    end
+                end
+                cursor = data.nextPageCursor and ("&cursor="..data.nextPageCursor) or nil
+            else break end
+        else break end
+        task.wait()
+    until not cursor
+    return servers
+end
 
-    TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[1].id)
-end)
+ServerBox:AddButton({
+    Text = 'Server Hop (Normal)',
+    Func = function()
+        local servers = getServers(game.PlaceId)
+        if #servers == 0 then Library:Notify("No servers found!", 5) return end
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)].id)
+    end,
+})
 
-misc:NewButton("Rejoin Server", function()
-    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
-end)
+ServerBox:AddButton({
+    Text = 'Server Hop (Lowest)',
+    Func = function()
+        local servers = getServers(game.PlaceId)
+        if #servers == 0 then Library:Notify("No servers found!", 5) return end
+        table.sort(servers, function(a,b) return a.playing < b.playing end)
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[1].id)
+    end,
+})
+
+ServerBox:AddButton({
+    Text = 'Rejoin Server',
+    Func = function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
+    end,
+})
+
+-- ===== Teams =====
+local TeamsBox = Tabs.Misc:AddLeftGroupbox('Teams')
+TeamsBox:AddButton({
+    Text = 'Switch to Marines',
+    Tooltip = 'Switches to the Marines team',
+    Func = function()
+        CommF:InvokeServer("SetTeam", "Marines")
+    end,
+})
+TeamsBox:AddButton({
+    Text = 'Switch to Pirates',
+    Tooltip = 'Switches to the Pirates team',
+    Func = function()
+        CommF:InvokeServer("SetTeam", "Pirates")
+    end,
+})
 
 -- // ============================================================== Teleport Tab ============================================================== \\ --
-local teleport = Init:NewTab("Teleport")
+
+-- ===== Boat Teleport =====
+local BoatTpBox = Tabs.Teleport:AddLeftGroupbox('Boat Teleport')
 
 local selectedTpBoat = nil
 local boatMap = {}
-
-local boatTpS = nil
-local boatDropdown = nil
-local refreshBoatBtn = nil
-local teleportBoatBtn = nil
 
 local function getBoatList()
     local list = {}
@@ -1729,7 +1870,7 @@ local function getBoatList()
     for _, boat in ipairs(boatsFolder:GetChildren()) do
         local ownerVal = boat:FindFirstChild("Owner")
         local owner = ownerVal and tostring(ownerVal.Value) or "Unknown"
-        local label = boat.Name .. " (" .. owner .. ")"
+        local label = boat.Name.." ("..owner..")"
         table.insert(list, label)
         boatMap[label] = boat
     end
@@ -1738,151 +1879,99 @@ end
 
 local function getAvailableSeat(boat)
     for _, v in ipairs(boat:GetDescendants()) do
-        if (v:IsA("Seat") or v:IsA("VehicleSeat")) and not v:FindFirstChild("SeatWeld") then
-            return v
-        end
+        if (v:IsA("Seat") or v:IsA("VehicleSeat")) and not v:FindFirstChild("SeatWeld") then return v end
     end
     return nil
 end
 
-local function rebuildBoatSection()
-    if teleportBoatBtn then teleportBoatBtn:Remove() end
-    if refreshBoatBtn then refreshBoatBtn:Remove() end
-    if boatDropdown then boatDropdown:Remove() end
-    if boatTpS then boatTpS:Remove() end
+local initialBoatList = getBoatList()
+if #initialBoatList == 0 then initialBoatList = {"None"} end
 
-    boatTpS = nil
-    boatDropdown = nil
-    refreshBoatBtn = nil
-    teleportBoatBtn = nil
+BoatTpBox:AddDropdown('BoatTpSelect', {
+    Text = 'Select Boat',
+    Values = initialBoatList,
+    Default = 1,
+    Tooltip = 'Pick a boat to teleport',
+})
+Options.BoatTpSelect:OnChanged(function() selectedTpBoat = Options.BoatTpSelect.Value end)
+selectedTpBoat = initialBoatList[1]
 
-    boatTpS = teleport:NewSection("Boat Teleport")
+BoatTpBox:AddButton({
+    Text = 'Refresh Boat List',
+    Func = function()
+        local newList = getBoatList()
+        if #newList == 0 then newList = {"None"} end
+        Options.BoatTpSelect:SetValues(newList)
+        Options.BoatTpSelect:SetValue(newList[1])
+        selectedTpBoat = newList[1]
+        Library:Notify("Refreshed boat list!", 3)
+    end,
+})
 
-    local newList = getBoatList()
-
-    boatDropdown = teleport:NewSelector("Select Boat", "Pick a boat", newList, function(v)
-        selectedTpBoat = v
-    end)
-
-    refreshBoatBtn = teleport:NewButton("Refresh Boat List", function()
-        selectedTpBoat = nil
-        rebuildBoatSection()
-        Notif:Notify("Boat list refreshed!", 3, "success")
-    end)
-
-    teleportBoatBtn = teleport:NewButton("Teleport Boat", function()
-        if not selectedTpBoat then
-            Notif:Notify("Select a boat first!", 5, "error")
-            return
+BoatTpBox:AddButton({
+    Text = 'Teleport Boat',
+    Func = function()
+        if not selectedTpBoat or selectedTpBoat == "None" then
+            Library:Notify("Select a boat first!", 5) return
         end
-
         local boat = boatMap[selectedTpBoat]
-        if not boat or not boat.Parent then
-            Notif:Notify("Boat not found!", 5, "error")
-            return
-        end
-
+        if not boat or not boat.Parent then Library:Notify("Boat not found!", 5) return end
         local char = plr.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChild("Humanoid")
-        if not hrp or not hum then
-            Notif:Notify("Character not ready!", 5, "error")
-            return
-        end
-
+        if not hrp or not hum then Library:Notify("Character not ready!", 5) return end
         local seat = getAvailableSeat(boat)
-        if not seat then
-            Notif:Notify("No available seats on this boat!", 5, "error")
-            return
+        if not seat then Library:Notify("No available seats!", 5) return end
+        if (seat.Position - hrp.Position).Magnitude < 1000 then
+            Library:Notify("Boat is too close! Must be at least 1000 studs away.", 5) return
         end
-
-        local dist = (seat.Position - hrp.Position).Magnitude
-        if dist < 1000 then
-            Notif:Notify("Boat is too close! Must be 1000+ studs away.", 5, "error")
-            return
-        end
-
         hrp.CFrame = seat.CFrame
         hrp.AssemblyLinearVelocity = Vector3.zero
         hrp.AssemblyAngularVelocity = Vector3.zero
-
         task.spawn(function()
             local attempts = 0
-            repeat
-                task.wait(0.1)
-                attempts = attempts + 1
-            until hum.SeatPart ~= nil or attempts >= 15
-
-            if hum.SeatPart then
-                Notif:Notify("Teleported to boat!", 5, "success")
-            else
-                Notif:Notify("Failed to sit, try again!", 5, "error")
-            end
+            repeat task.wait(0.1) attempts = attempts + 1 until hum.SeatPart ~= nil or attempts >= 15
+            if hum.SeatPart then Library:Notify("Teleported boat!", 5)
+            else Library:Notify("Failed to sit, try again!", 5) end
         end)
-    end)
-end
-
-rebuildBoatSection()
+    end,
+})
 
 -- // ============================================================== Utils ============================================================== \\ --
-function getSpawnedChests()
+
+getSpawnedChests = function()
     local spawnedChests = {}
     local mapFolder = workspace:FindFirstChild("Map")
     if not mapFolder then return spawnedChests end
-    
     local function search(parent)
         for _, child in ipairs(parent:GetChildren()) do
             if child:IsA("BasePart") and (child.Name == "Chest3" or child.Name == "Chest2" or child.Name == "Chest1") then
                 local hasTouchInterest = false
-                local touchInterests = child:GetChildren()
-                
-                for _, obj in ipairs(touchInterests) do
-                    if obj:IsA("TouchTransmitter") then
-                        hasTouchInterest = true
-                        break
-                    end
+                for _, obj in ipairs(child:GetChildren()) do
+                    if obj:IsA("TouchTransmitter") then hasTouchInterest = true break end
                 end
-                
                 if hasTouchInterest then
-                    local touchInterestCount = 0
-                    for _, obj in ipairs(touchInterests) do
+                    local count = 0
+                    local kept = false
+                    for _, obj in ipairs(child:GetChildren()) do
                         if obj.ClassName == "TouchInterest" or obj:IsA("TouchTransmitter") then
-                            touchInterestCount = touchInterestCount + 1
-                        end
-                    end
-                    
-                    if touchInterestCount > 1 then
-                        local keptOne = false
-                        for _, obj in ipairs(touchInterests) do
-                            if (obj.ClassName == "TouchInterest" or obj:IsA("TouchTransmitter")) and not keptOne then
-                                keptOne = true
-                            elseif (obj.ClassName == "TouchInterest" or obj:IsA("TouchTransmitter")) and keptOne then
-                                obj:Destroy()
-                            end
+                            count = count + 1
+                            if kept then obj:Destroy() else kept = true end
                         end
                     end
                     table.insert(spawnedChests, child)
                 end
             end
-            
-            if #child:GetChildren() > 0 then
-                search(child)
-            end
+            if #child:GetChildren() > 0 then search(child) end
         end
     end
-    
     search(mapFolder)
     return spawnedChests
 end
 
 watchChest = function(chest)
-    if chestConnection then
-        chestConnection:Disconnect()
-        chestConnection = nil
-    end
-
+    if chestConnection then chestConnection:Disconnect() chestConnection = nil end
     currentChest = chest
-
     chestConnection = chest.ChildRemoved:Connect(function(child)
         if child:IsA("TouchTransmitter") or child.ClassName == "TouchInterest" then
             currentChest = nil
@@ -1890,100 +1979,19 @@ watchChest = function(chest)
     end)
 end
 
-function setPlayerMotion(velocity)
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = character.HumanoidRootPart
-    
-    if not bodyVelocity or bodyVelocity.Parent ~= hrp then
-        if bodyVelocity then bodyVelocity:Destroy() end
-        bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bodyVelocity.P = 10000
-        bodyVelocity.Parent = hrp
-    end
-    
-    bodyVelocity.Velocity = velocity
-end
+-- // ============================================================== UI Settings ============================================================== \\ --
 
-function enableNoclip()
-    noclipEnabled = true
-    coroutine.wrap(function()
-        while noclipEnabled and character do
-            game:GetService("RunService").Stepped:Wait()
-            if character then
-                for _, part in pairs(character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end
-        end
-    end)()
-end
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+MenuGroup:AddButton({ Text = 'Unload', Func = function() Library:Unload() end })
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'LeftAlt', NoUI = true, Text = 'Menu keybind' })
+Library.ToggleKeybind = Options.MenuKeybind
 
-local function getTargets()
-    local targetList = {}
-    local primaryPart = nil
-    
-    for _, mob in pairs(workspace.Enemies:GetChildren()) do
-        local hum = mob:FindFirstChild("Humanoid")
-        local root = mob:FindFirstChild("HumanoidRootPart")
-        
-        if hum and root and hum.Health > 0 then
-            local dist = (root.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-            if dist < attackRange then
-                table.insert(targetList, {mob, root})
-                primaryPart = root
-            end
-        end
-    end
-    return primaryPart, targetList
-end
-
-getServers = function(placeId)
-    local servers = {}
-    local cursor = ""
-
-    repeat
-        local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"..cursor
-        local success, res = pcall(function()
-            return request({Url = url, Method = "GET"})
-        end)
-
-        if success and res and res.Body then
-            local successDecode, data = pcall(function()
-                return HttpService:JSONDecode(res.Body)
-            end)
-
-            if successDecode and data and data.data then
-                for _, server in ipairs(data.data) do
-                    if server.playing < server.maxPlayers and server.id ~= game.JobId then
-                        table.insert(servers, server)
-                    end
-                end
-
-                cursor = data.nextPageCursor and ("&cursor=" .. data.nextPageCursor) or nil
-            else
-                warn("Failed to decode server data or invalid response structure.")
-                break
-            end
-        else
-            warn("Failed to fetch server data from URL: " .. url)
-            break
-        end
-
-        task.wait()
-    until not cursor
-
-    if #servers == 0 then
-        warn("No servers found for placeId: " .. placeId)
-    end
-
-    return servers
-end
-
-plr.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    task.wait()
-    character2 = charFolder:FindFirstChild(plr.Name)
-end)
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({'MenuKeybind'})
+ThemeManager:SetFolder('catware')
+SaveManager:SetFolder('catware/bloxfruits')
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
