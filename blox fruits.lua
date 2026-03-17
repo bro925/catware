@@ -239,23 +239,6 @@ local function isUsingTRexFruit()
     return false
 end
 
-local function scanSeaBeasts()
-    local seaBeastsFolder = workspace:FindFirstChild("SeaBeasts")
-    if not seaBeastsFolder then return {} end
-    
-    local seaBeasts = {}
-    for _, beast in ipairs(seaBeastsFolder:GetChildren()) do
-        if beast:IsA("Model") then
-            local beastHrp = beast:FindFirstChild("HumanoidRootPart")
-            local beastHum = beast:FindFirstChildOfClass("Humanoid")
-            if beastHrp and beastHum and beastHum.Health > 0 then
-                table.insert(seaBeasts, beast)
-            end
-        end
-    end
-    return seaBeasts
-end
-
 local function isSword(name)
     for _, sword in ipairs(swordList) do
         if name == sword then return true end
@@ -397,6 +380,7 @@ Toggles.KillAuraEnabled:OnChanged(function()
         task.spawn(function()
             local enemiesFolder = workspace:FindFirstChild("Enemies")
             local charactersFolder = workspace:FindFirstChild("Characters")
+            local seaBeastsFolder = workspace:FindFirstChild("SeaBeasts")
             local lastTargetScan = 0
             local cachedTargets = {}
 
@@ -472,10 +456,11 @@ Toggles.KillAuraEnabled:OnChanged(function()
                                         if auraTargetTypes.Players then
                                             scanFolder(charactersFolder, true)
                                         end
-                                        
-                                        if auraTargetTypes['Sea Beasts'] then
-                                            local seaBeasts = scanSeaBeasts()
-                                            for _, beast in ipairs(seaBeasts) do
+                                    end
+                                    
+                                    if seaBeastsFolder and usingTRex then
+                                        for _, beast in ipairs(seaBeastsFolder:GetChildren()) do
+                                            if beast:IsA("Model") and beast.Name:sub(1, 8) == "SeaBeast" then
                                                 local beastHrp = beast:FindFirstChild("HumanoidRootPart")
                                                 if beastHrp and (hrp.Position - beastHrp.Position).Magnitude < auraRange then
                                                     table.insert(cachedTargets, beast)
@@ -491,22 +476,18 @@ Toggles.KillAuraEnabled:OnChanged(function()
                                     if currentTargetIndex > #cachedTargets then currentTargetIndex = 1 end
                                     local target = cachedTargets[currentTargetIndex]
                                     local targetHrp = target:FindFirstChild("HumanoidRootPart")
+                                    
+                                    local isSeaBeast = target.Name:sub(1, 8) == "SeaBeast"
 
                                     if usingTRex and targetHrp then
-                                        local isSeaBeast = target.Parent and target.Parent.Name == "SeaBeasts"
-                                        
                                         if isSeaBeast then
-                                            if hrp.Position.Y < targetHrp.Position.Y then
-                                                attackTRexCustom(targetHrp, Vector3.new(0, 1, 0))
-                                            else
-                                                attackTRexCustom(targetHrp, Vector3.new(0, -1, 0))
-                                            end
+                                            attackTRex(targetHrp)
                                         elseif targetsStunned(cachedTargets) then
                                             attackTRexCustom(targetHrp, Vector3.new(0, -1, 0))
                                         else
                                             attackTRex(targetHrp)
                                         end
-                                    elseif canAttackNormally then
+                                    elseif canAttackNormally and targetHrp and not isSeaBeast then
                                         attack(target)
                                     end
 
@@ -1134,6 +1115,10 @@ local BringMobsBox = Tabs.Farming:AddRightGroupbox('Bring Mobs')
 local bringMobsEnabled = false
 local bringBossesEnabled = false
 local bringRange = 300
+local bringDistance = 10
+
+local frozenMobs = {}
+local lastScan = 0
 
 BringMobsBox:AddToggle('BringMobs', {
     Text = 'Enabled',
@@ -1147,41 +1132,140 @@ BringMobsBox:AddToggle('BringMobs', {
     SyncToggleState = true,
 })
 
-local BringBossesDepbox = BringMobsBox:AddDependencyBox()
-BringBossesDepbox:AddToggle('BringBosses', {
+BringMobsBox:AddToggle('BringBosses', {
     Text = 'Bring Bosses',
     Default = false,
-    Tooltip = 'Also bring boss enemies',
+    Tooltip = 'Also bring Bosses',
 })
-BringBossesDepbox:SetupDependencies({ {Toggles.BringMobs, true} })
 
-Toggles.BringMobs:OnChanged(function() bringMobsEnabled = Toggles.BringMobs.Value end)
-Toggles.BringBosses:OnChanged(function() bringBossesEnabled = Toggles.BringBosses.Value end)
+BringMobsBox:AddSlider('BringRange', {
+    Text = 'Bring Range',
+    Default = 300,
+    Min = 50,
+    Max = 1000,
+    Rounding = 0,
+    Suffix = ' studs',
+})
 
-local sethiddenproperty = sethiddenproperty or function(...) return ... end
-task.spawn(function()
-    while task.wait(0.2) do
-        if bringMobsEnabled and character and character:FindFirstChild("HumanoidRootPart") then
-            pcall(sethiddenproperty, plr, "SimulationRadius", math.huge)
-            local root = character.HumanoidRootPart
-            for _, mob in pairs(workspace.Enemies:GetChildren()) do
+BringMobsBox:AddSlider('BringDistance', {
+    Text = 'Bring Distance',
+    Default = 10,
+    Min = 5,
+    Max = 30,
+    Rounding = 0,
+    Suffix = ' studs',
+    Tooltip = 'How far in front of you to bring mobs',
+})
+
+Toggles.BringMobs:OnChanged(function() 
+    bringMobsEnabled = Toggles.BringMobs.Value
+    
+    -- Restore all frozen mobs when disabled
+    if not bringMobsEnabled then
+        for mob, data in pairs(frozenMobs) do
+            if mob and mob.Parent then
                 local mRoot = mob:FindFirstChild("HumanoidRootPart")
+                if mRoot then
+                    mRoot.CanCollide = data.canCollide
+                    mRoot.AssemblyLinearVelocity = Vector3.zero
+                    mRoot.AssemblyAngularVelocity = Vector3.zero
+                end
+            end
+        end
+        frozenMobs = {}
+    end
+end)
+
+Toggles.BringBosses:OnChanged(function() 
+    bringBossesEnabled = Toggles.BringBosses.Value 
+end)
+
+Options.BringRange:OnChanged(function() 
+    bringRange = Options.BringRange.Value 
+end)
+
+Options.BringDistance:OnChanged(function() 
+    bringDistance = Options.BringDistance.Value 
+end)
+
+local sethiddenproperty = sethiddenproperty or function() end
+
+local function getTargetPosition(rootCFrame)
+    local lookVector = rootCFrame.LookVector
+    return rootCFrame.Position + (lookVector * bringDistance) + Vector3.new(0, 8, 0)
+end
+
+task.spawn(function()
+    while task.wait(0.15) do
+        if bringMobsEnabled and character and character:FindFirstChild("HumanoidRootPart") then
+            local root = character.HumanoidRootPart
+            local targetPos = getTargetPosition(root.CFrame)
+            
+            pcall(sethiddenproperty, plr, "SimulationRadius", 100000)
+            
+            local enemiesFolder = workspace:FindFirstChild("Enemies")
+            if not enemiesFolder then return end
+            
+            local currentMobs = {}
+            
+            for _, mob in ipairs(enemiesFolder:GetChildren()) do
+                local mRoot = mob:FindFirstChild("HumanoidRootPart")
+                if not mRoot then continue end
+                
                 local mHum = mob:FindFirstChild("Humanoid")
-                if mRoot and mHum and mHum.Health > 0 then
-                    local dist = (mRoot.Position - root.Position).Magnitude
-                    if dist <= bringRange then
-                        local isBoss = mob:GetAttribute("IsBoss") == true
-                        if not isBoss or (isBoss and bringBossesEnabled) then
-                            local targetPos = root.Position + Vector3.new(0, 7, 0)
-                            mRoot.CFrame = CFrame.lookAt(targetPos, targetPos + Vector3.new(0, 1, 0))
-                            mRoot.CanCollide = false
-                            mRoot.AssemblyLinearVelocity = Vector3.zero
-                            mRoot.AssemblyAngularVelocity = Vector3.zero
-                            mHum:ChangeState(Enum.HumanoidStateType.Running)
+                if not (mHum and mHum.Health > 0) then continue end
+                
+                local dist = (mRoot.Position - root.Position).Magnitude
+                if dist > bringRange then continue end
+                
+                local isBoss = mob:GetAttribute("IsBoss") == true
+                if isBoss and not bringBossesEnabled then continue end
+                
+                currentMobs[mob] = true
+                
+                if not frozenMobs[mob] then
+                    frozenMobs[mob] = {
+                        canCollide = mRoot.CanCollide
+                    }
+                end
+                
+                mRoot.CanCollide = false
+                
+                mRoot.CFrame = CFrame.lookAt(targetPos, targetPos + (targetPos - mRoot.Position).Unit)
+                
+                mRoot.AssemblyLinearVelocity = Vector3.zero
+                mRoot.AssemblyAngularVelocity = Vector3.zero
+                
+                game:GetService("RunService").Heartbeat:Connect(function()
+                    if mRoot and mRoot.Parent then
+                        mRoot.AssemblyLinearVelocity = Vector3.zero
+                        mRoot.AssemblyAngularVelocity = Vector3.zero
+                    end
+                end)
+            end
+            
+            for mob in pairs(frozenMobs) do
+                if not currentMobs[mob] then
+                    if mob and mob.Parent then
+                        local mRoot = mob:FindFirstChild("HumanoidRootPart")
+                        if mRoot then
+                            mRoot.CanCollide = frozenMobs[mob].canCollide
                         end
+                    end
+                    frozenMobs[mob] = nil
+                end
+            end
+            
+        elseif not bringMobsEnabled then
+            for mob, data in pairs(frozenMobs) do
+                if mob and mob.Parent then
+                    local mRoot = mob:FindFirstChild("HumanoidRootPart")
+                    if mRoot then
+                        mRoot.CanCollide = data.canCollide
                     end
                 end
             end
+            frozenMobs = {}
         end
     end
 end)
