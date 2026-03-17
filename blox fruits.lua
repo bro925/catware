@@ -1201,7 +1201,7 @@ task.spawn(function()
             local root = character.HumanoidRootPart
             local targetPos = getTargetPosition(root.CFrame)
             
-            pcall(sethiddenproperty, plr, "SimulationRadius", 100000)
+            pcall(sethiddenproperty, plr, "SimulationRadius", math.huge)
             
             local enemiesFolder = workspace:FindFirstChild("Enemies")
             if not enemiesFolder then return end
