@@ -458,11 +458,11 @@ Toggles.KillAuraEnabled:OnChanged(function()
                                         end
                                     end
                                     
-                                    if seaBeastsFolder and usingTRex then
+                                    if auraTargetTypes and auraTargetTypes['Sea Beasts'] and seaBeastsFolder and usingTRex then
                                         for _, beast in ipairs(seaBeastsFolder:GetChildren()) do
                                             if beast:IsA("Model") and beast.Name:sub(1, 8) == "SeaBeast" then
                                                 local beastHrp = beast:FindFirstChild("HumanoidRootPart")
-                                                if beastHrp and (hrp.Position - beastHrp.Position).Magnitude < auraRange then
+                                                if beastHrp then
                                                     table.insert(cachedTargets, beast)
                                                 end
                                             end
