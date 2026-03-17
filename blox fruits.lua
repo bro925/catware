@@ -398,19 +398,10 @@ Toggles.KillAuraEnabled:OnChanged(function()
                             if startTime - lastTargetScan > 0.1 then
                                 if auraTargetTypes and auraTargetTypes.Mobs and enemiesFolder then
                                     for _, target in ipairs(enemiesFolder:GetChildren()) do
-                                        local targetHum = target:FindFirstChildOfClass("Humanoid")
-                                        if targetHum and targetHum.Health > 0 then
-                                            local targetHrp = target:FindFirstChild("HumanoidRootPart")
-                                            if targetHrp and (hrp.Position - targetHrp.Position).Magnitude < 1000 then
-                                                targetHum.Health = 0
-                                            end
+                                        if target.Name == "Terrorshark" then
+                                            continue
                                         end
-                                    end
-                                end
-                                
-                                if auraTargetTypes and auraTargetTypes.Players and charactersFolder then
-                                    for _, target in ipairs(charactersFolder:GetChildren()) do
-                                        if target == char then continue end
+                                        
                                         local targetHum = target:FindFirstChildOfClass("Humanoid")
                                         if targetHum and targetHum.Health > 0 then
                                             local targetHrp = target:FindFirstChild("HumanoidRootPart")
@@ -1115,10 +1106,6 @@ local BringMobsBox = Tabs.Farming:AddRightGroupbox('Bring Mobs')
 local bringMobsEnabled = false
 local bringBossesEnabled = false
 local bringRange = 300
-local bringDistance = 10
-
-local frozenMobs = {}
-local lastScan = 0
 
 BringMobsBox:AddToggle('BringMobs', {
     Text = 'Enabled',
@@ -1132,140 +1119,41 @@ BringMobsBox:AddToggle('BringMobs', {
     SyncToggleState = true,
 })
 
-BringMobsBox:AddToggle('BringBosses', {
+local BringBossesDepbox = BringMobsBox:AddDependencyBox()
+BringBossesDepbox:AddToggle('BringBosses', {
     Text = 'Bring Bosses',
     Default = false,
     Tooltip = 'Also bring Bosses',
 })
+BringBossesDepbox:SetupDependencies({ {Toggles.BringMobs, true} })
 
-BringMobsBox:AddSlider('BringRange', {
-    Text = 'Bring Range',
-    Default = 300,
-    Min = 50,
-    Max = 1000,
-    Rounding = 0,
-    Suffix = ' studs',
-})
+Toggles.BringMobs:OnChanged(function() bringMobsEnabled = Toggles.BringMobs.Value end)
+Toggles.BringBosses:OnChanged(function() bringBossesEnabled = Toggles.BringBosses.Value end)
 
-BringMobsBox:AddSlider('BringDistance', {
-    Text = 'Bring Distance',
-    Default = 10,
-    Min = 5,
-    Max = 30,
-    Rounding = 0,
-    Suffix = ' studs',
-    Tooltip = 'How far in front of you to bring mobs',
-})
-
-Toggles.BringMobs:OnChanged(function() 
-    bringMobsEnabled = Toggles.BringMobs.Value
-    
-    -- Restore all frozen mobs when disabled
-    if not bringMobsEnabled then
-        for mob, data in pairs(frozenMobs) do
-            if mob and mob.Parent then
-                local mRoot = mob:FindFirstChild("HumanoidRootPart")
-                if mRoot then
-                    mRoot.CanCollide = data.canCollide
-                    mRoot.AssemblyLinearVelocity = Vector3.zero
-                    mRoot.AssemblyAngularVelocity = Vector3.zero
-                end
-            end
-        end
-        frozenMobs = {}
-    end
-end)
-
-Toggles.BringBosses:OnChanged(function() 
-    bringBossesEnabled = Toggles.BringBosses.Value 
-end)
-
-Options.BringRange:OnChanged(function() 
-    bringRange = Options.BringRange.Value 
-end)
-
-Options.BringDistance:OnChanged(function() 
-    bringDistance = Options.BringDistance.Value 
-end)
-
-local sethiddenproperty = sethiddenproperty or function() end
-
-local function getTargetPosition(rootCFrame)
-    local lookVector = rootCFrame.LookVector
-    return rootCFrame.Position + (lookVector * bringDistance) + Vector3.new(0, 8, 0)
-end
-
+local sethiddenproperty = sethiddenproperty or function(...) return ... end
 task.spawn(function()
-    while task.wait(0.15) do
+    while task.wait(0) do
         if bringMobsEnabled and character and character:FindFirstChild("HumanoidRootPart") then
-            local root = character.HumanoidRootPart
-            local targetPos = getTargetPosition(root.CFrame)
-            
             pcall(sethiddenproperty, plr, "SimulationRadius", math.huge)
-            
-            local enemiesFolder = workspace:FindFirstChild("Enemies")
-            if not enemiesFolder then return end
-            
-            local currentMobs = {}
-            
-            for _, mob in ipairs(enemiesFolder:GetChildren()) do
+            local root = character.HumanoidRootPart
+            for _, mob in pairs(workspace.Enemies:GetChildren()) do
                 local mRoot = mob:FindFirstChild("HumanoidRootPart")
-                if not mRoot then continue end
-                
                 local mHum = mob:FindFirstChild("Humanoid")
-                if not (mHum and mHum.Health > 0) then continue end
-                
-                local dist = (mRoot.Position - root.Position).Magnitude
-                if dist > bringRange then continue end
-                
-                local isBoss = mob:GetAttribute("IsBoss") == true
-                if isBoss and not bringBossesEnabled then continue end
-                
-                currentMobs[mob] = true
-                
-                if not frozenMobs[mob] then
-                    frozenMobs[mob] = {
-                        canCollide = mRoot.CanCollide
-                    }
-                end
-                
-                mRoot.CanCollide = false
-                
-                mRoot.CFrame = CFrame.lookAt(targetPos, targetPos + (targetPos - mRoot.Position).Unit)
-                
-                mRoot.AssemblyLinearVelocity = Vector3.zero
-                mRoot.AssemblyAngularVelocity = Vector3.zero
-                
-                game:GetService("RunService").Heartbeat:Connect(function()
-                    if mRoot and mRoot.Parent then
-                        mRoot.AssemblyLinearVelocity = Vector3.zero
-                        mRoot.AssemblyAngularVelocity = Vector3.zero
-                    end
-                end)
-            end
-            
-            for mob in pairs(frozenMobs) do
-                if not currentMobs[mob] then
-                    if mob and mob.Parent then
-                        local mRoot = mob:FindFirstChild("HumanoidRootPart")
-                        if mRoot then
-                            mRoot.CanCollide = frozenMobs[mob].canCollide
+                if mRoot and mHum and mHum.Health > 0 then
+                    local dist = (mRoot.Position - root.Position).Magnitude
+                    if dist <= bringRange then
+                        local isBoss = mob:GetAttribute("IsBoss") == true
+                        if not isBoss or (isBoss and bringBossesEnabled) then
+                            local targetPos = root.Position + Vector3.new(0, 9, 9)
+                            mRoot.CFrame = CFrame.lookAt(targetPos, targetPos + Vector3.new(0, 1, 0))
+                            mRoot.CanCollide = false
+                            mRoot.AssemblyLinearVelocity = Vector3.zero
+                            mRoot.AssemblyAngularVelocity = Vector3.zero
+                            mHum:ChangeState(Enum.HumanoidStateType.Running)
                         end
                     end
-                    frozenMobs[mob] = nil
                 end
             end
-            
-        elseif not bringMobsEnabled then
-            for mob, data in pairs(frozenMobs) do
-                if mob and mob.Parent then
-                    local mRoot = mob:FindFirstChild("HumanoidRootPart")
-                    if mRoot then
-                        mRoot.CanCollide = data.canCollide
-                    end
-                end
-            end
-            frozenMobs = {}
         end
     end
 end)
@@ -1503,8 +1391,9 @@ local boatFlyVSpeed = 100
 local boatNoclipEnabled = false
 local boatCONTROL = {F=0,B=0,L=0,R=0,U=0,D=0}
 local boatBV, boatBG = nil, nil
-local boatFlyConnection, flyKeyDown, flyKeyUp, seatWeldConnection = nil, nil, nil, nil
+local boatFlyConnection, flyKeyDown, flyKeyUp, seatWeldConnection, noclipConnection = nil, nil, nil, nil, nil
 local currentSeat, currentBoat, boatRoot = nil, nil, nil
+local waitingForBoat = false
 
 local function getPlayerSeatAndBoat()
     local boatsFolder = workspace:FindFirstChild("Boats")
@@ -1550,7 +1439,38 @@ local function keepSeated()
     end
 end
 
-local function stopBoatFly()
+local function applyNoclip()
+    if not boatNoclipEnabled or not currentBoat then return end
+    
+    for _, part in ipairs(currentBoat:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+    
+    if plr.Character then
+        for _, part in ipairs(plr.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+    
+    for _, child in ipairs(currentBoat:GetDescendants()) do
+        if child:IsA("VehicleSeat") or child:IsA("Seat") then
+            if child.Occupant and child.Occupant.Parent then
+                local otherChar = child.Occupant.Parent
+                for _, part in ipairs(otherChar:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function stopBoatFly(keepEnabled)
     if boatBV and boatBV.Parent then boatBV:Destroy() end
     if boatBG and boatBG.Parent then boatBG:Destroy() end
     boatBV, boatBG = nil, nil
@@ -1558,99 +1478,121 @@ local function stopBoatFly()
     if flyKeyDown then flyKeyDown:Disconnect() flyKeyDown = nil end
     if flyKeyUp then flyKeyUp:Disconnect() flyKeyUp = nil end
     if seatWeldConnection then seatWeldConnection:Disconnect() seatWeldConnection = nil end
+    if noclipConnection then noclipConnection:Disconnect() noclipConnection = nil end
     boatCONTROL = {F=0,B=0,L=0,R=0,U=0,D=0}
     currentSeat, currentBoat, boatRoot = nil, nil, nil
+    
+    if not keepEnabled and boatFlyEnabled then
+        boatFlyEnabled = false
+        Toggles.BoatFly:SetValue(false)
+    end
 end
 
 local function startBoatFly()
-    stopBoatFly()
     currentSeat, currentBoat = getPlayerSeatAndBoat()
-    if not currentSeat or not currentBoat then
-        Library:Notify("Not sitting in a boat!", 5)
-        boatFlyEnabled = false
-        Toggles.BoatFly:SetValue(false)
-        return
-    end
-    boatRoot = getBoatRoot(currentBoat)
-    if not boatRoot then
-        Library:Notify("Could not find boat root!", 5)
-        boatFlyEnabled = false
-        Toggles.BoatFly:SetValue(false)
-        return
-    end
-    if currentSeat:IsA("VehicleSeat") then
-        currentSeat.HeadsUpDisplay = false
-        workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-    end
-    boatBV = Instance.new("BodyVelocity")
-    boatBV.MaxForce = Vector3.new(9e9,9e9,9e9)
-    boatBV.Velocity = Vector3.zero
-    boatBV.Parent = boatRoot
-    boatBG = Instance.new("BodyGyro")
-    boatBG.MaxTorque = Vector3.new(9e9,9e9,9e9)
-    boatBG.P = 5000
-    boatBG.D = 400
-    boatBG.CFrame = boatRoot.CFrame
-    boatBG.Parent = boatRoot
-    keepSeated()
-    seatWeldConnection = RunService.Heartbeat:Connect(keepSeated)
-    flyKeyDown = UserInputService.InputBegan:Connect(function(input, processed)
-        if processed or not boatFlyEnabled then return end
-        if input.KeyCode == Enum.KeyCode.W then boatCONTROL.F = 1
-        elseif input.KeyCode == Enum.KeyCode.S then boatCONTROL.B = 1
-        elseif input.KeyCode == Enum.KeyCode.A then boatCONTROL.L = 1
-        elseif input.KeyCode == Enum.KeyCode.D then boatCONTROL.R = 1
-        elseif input.KeyCode == Enum.KeyCode.C then boatCONTROL.U = 1
-        elseif input.KeyCode == Enum.KeyCode.V then boatCONTROL.D = 1 end
-    end)
-    flyKeyUp = UserInputService.InputEnded:Connect(function(input, processed)
-        if processed or not boatFlyEnabled then return end
-        if input.KeyCode == Enum.KeyCode.W then boatCONTROL.F = 0
-        elseif input.KeyCode == Enum.KeyCode.S then boatCONTROL.B = 0
-        elseif input.KeyCode == Enum.KeyCode.A then boatCONTROL.L = 0
-        elseif input.KeyCode == Enum.KeyCode.D then boatCONTROL.R = 0
-        elseif input.KeyCode == Enum.KeyCode.C then boatCONTROL.U = 0
-        elseif input.KeyCode == Enum.KeyCode.V then boatCONTROL.D = 0 end
-    end)
-    boatFlyConnection = RunService.Heartbeat:Connect(function()
-        if not boatFlyEnabled then return end
-        local seat, boat = getPlayerSeatAndBoat()
-        if not seat or not boat then
-            stopBoatFly()
-            boatFlyEnabled = false
-            Library:Notify("Left boat, disabling fly", 3)
-            return
+    
+    if currentSeat and currentBoat then
+        boatRoot = getBoatRoot(currentBoat)
+        if not boatRoot then return false end
+        
+        if currentSeat:IsA("VehicleSeat") then
+            currentSeat.HeadsUpDisplay = false
+            workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
         end
-        if boat ~= currentBoat then
-            currentBoat = boat currentSeat = seat boatRoot = getBoatRoot(boat)
-            if boatBV then boatBV.Parent = boatRoot end
-            if boatBG then boatBG.Parent = boatRoot end
-        end
-        if boatNoclipEnabled and currentBoat then
-            for _, part in ipairs(currentBoat:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
+        
+        boatBV = Instance.new("BodyVelocity")
+        boatBV.MaxForce = Vector3.new(9e9,9e9,9e9)
+        boatBV.Velocity = Vector3.zero
+        boatBV.Parent = boatRoot
+        
+        boatBG = Instance.new("BodyGyro")
+        boatBG.MaxTorque = Vector3.new(9e9,9e9,9e9)
+        boatBG.P = 5000
+        boatBG.D = 400
+        boatBG.CFrame = boatRoot.CFrame
+        boatBG.Parent = boatRoot
+        
+        keepSeated()
+        seatWeldConnection = RunService.Heartbeat:Connect(keepSeated)
+        
+        flyKeyDown = UserInputService.InputBegan:Connect(function(input, processed)
+            if processed or not boatFlyEnabled then return end
+            if input.KeyCode == Enum.KeyCode.W then boatCONTROL.F = 1
+            elseif input.KeyCode == Enum.KeyCode.S then boatCONTROL.B = 1
+            elseif input.KeyCode == Enum.KeyCode.A then boatCONTROL.L = 1
+            elseif input.KeyCode == Enum.KeyCode.D then boatCONTROL.R = 1
+            elseif input.KeyCode == Enum.KeyCode.C then boatCONTROL.U = 1
+            elseif input.KeyCode == Enum.KeyCode.V then boatCONTROL.D = 1 end
+        end)
+        
+        flyKeyUp = UserInputService.InputEnded:Connect(function(input, processed)
+            if processed or not boatFlyEnabled then return end
+            if input.KeyCode == Enum.KeyCode.W then boatCONTROL.F = 0
+            elseif input.KeyCode == Enum.KeyCode.S then boatCONTROL.B = 0
+            elseif input.KeyCode == Enum.KeyCode.A then boatCONTROL.L = 0
+            elseif input.KeyCode == Enum.KeyCode.D then boatCONTROL.R = 0
+            elseif input.KeyCode == Enum.KeyCode.C then boatCONTROL.U = 0
+            elseif input.KeyCode == Enum.KeyCode.V then boatCONTROL.D = 0 end
+        end)
+        
+        noclipConnection = RunService.Heartbeat:Connect(applyNoclip)
+        
+        boatFlyConnection = RunService.Heartbeat:Connect(function()
+            if not boatFlyEnabled then return end
+            
+            local seat, boat = getPlayerSeatAndBoat()
+            
+            if not seat or not boat then
+                stopBoatFly(true)
+                waitingForBoat = true
+                return
             end
-        end
-        local cam = workspace.CurrentCamera
-        local moveDir = Vector3.zero
-        if boatCONTROL.F == 1 then moveDir = moveDir + cam.CFrame.LookVector end
-        if boatCONTROL.B == 1 then moveDir = moveDir - cam.CFrame.LookVector end
-        if boatCONTROL.R == 1 then moveDir = moveDir + cam.CFrame.RightVector end
-        if boatCONTROL.L == 1 then moveDir = moveDir - cam.CFrame.RightVector end
-        local hMove = Vector3.new(moveDir.X, 0, moveDir.Z)
-        if hMove.Magnitude > 0 then hMove = hMove.Unit * boatFlyHSpeed end
-        local vVel = 0
-        if boatCONTROL.U == 1 then vVel = boatFlyVSpeed end
-        if boatCONTROL.D == 1 then vVel = -boatFlyVSpeed end
-        boatBV.Velocity = hMove + Vector3.new(0, vVel, 0)
-        local look = cam.CFrame.LookVector
-        local flatLook = Vector3.new(look.X, 0, look.Z).Unit
-        if hMove.Magnitude > 0 then
-            boatBG.CFrame = CFrame.lookAt(Vector3.zero, hMove)
-        else
-            boatBG.CFrame = CFrame.lookAt(Vector3.zero, flatLook)
-        end
-    end)
+            
+            if waitingForBoat then
+                waitingForBoat = false
+                startBoatFly()
+                return
+            end
+            
+            if boat ~= currentBoat then
+                currentBoat = boat
+                currentSeat = seat
+                boatRoot = getBoatRoot(boat)
+                if boatBV then boatBV.Parent = boatRoot end
+                if boatBG then boatBG.Parent = boatRoot end
+            end
+            
+            local cam = workspace.CurrentCamera
+            local moveDir = Vector3.zero
+            
+            if boatCONTROL.F == 1 then moveDir = moveDir + cam.CFrame.LookVector end
+            if boatCONTROL.B == 1 then moveDir = moveDir - cam.CFrame.LookVector end
+            if boatCONTROL.R == 1 then moveDir = moveDir + cam.CFrame.RightVector end
+            if boatCONTROL.L == 1 then moveDir = moveDir - cam.CFrame.RightVector end
+            
+            local hMove = Vector3.new(moveDir.X, 0, moveDir.Z)
+            if hMove.Magnitude > 0 then hMove = hMove.Unit * boatFlyHSpeed end
+            
+            local vVel = 0
+            if boatCONTROL.U == 1 then vVel = boatFlyVSpeed end
+            if boatCONTROL.D == 1 then vVel = -boatFlyVSpeed end
+            
+            boatBV.Velocity = hMove + Vector3.new(0, vVel, 0)
+            
+            local look = cam.CFrame.LookVector
+            local flatLook = Vector3.new(look.X, 0, look.Z).Unit
+            
+            if hMove.Magnitude > 0 then
+                boatBG.CFrame = CFrame.lookAt(Vector3.zero, hMove)
+            else
+                boatBG.CFrame = CFrame.lookAt(Vector3.zero, flatLook)
+            end
+        end)
+        
+        return true
+    end
+    
+    return false
 end
 
 BoatFlyBox:AddToggle('BoatFly', {
@@ -1673,15 +1615,34 @@ BoatFlyBox:AddLabel('Hold [V] to go down')
 
 Toggles.BoatFly:OnChanged(function()
     boatFlyEnabled = Toggles.BoatFly.Value
+    waitingForBoat = false
+    
     if boatFlyEnabled then
-        task.spawn(function() wait(0.1) startBoatFly() end)
+        if not startBoatFly() then
+            waitingForBoat = true
+            Library:Notify("[BoatFly] >> get on a boat bro", 6)
+            
+            task.spawn(function()
+                while boatFlyEnabled and waitingForBoat do
+                    if startBoatFly() then
+                        waitingForBoat = false
+                        break
+                    end
+                    task.wait(0.5)
+                end
+            end)
+        end
     else
-        stopBoatFly()
+        stopBoatFly(false)
+        waitingForBoat = false
     end
 end)
+
 Options.BoatFlyHSpeed:OnChanged(function() boatFlyHSpeed = Options.BoatFlyHSpeed.Value end)
 Options.BoatFlyVSpeed:OnChanged(function() boatFlyVSpeed = Options.BoatFlyVSpeed.Value end)
-Toggles.BoatNoclip:OnChanged(function() boatNoclipEnabled = Toggles.BoatNoclip.Value end)
+Toggles.BoatNoclip:OnChanged(function() 
+    boatNoclipEnabled = Toggles.BoatNoclip.Value
+end)
 
 -- // ============================================================== Player Tab ============================================================== \\ --
 
@@ -2064,6 +2025,29 @@ watchChest = function(chest)
 end
 
 -- // ============================================================== UI Settings ============================================================== \\ --
+
+Library:SetWatermarkVisibility(true)
+
+local FrameTimer = tick()
+local FrameCounter = 0;
+local FPS = 60;
+
+local WatermarkConnection = game:GetService('RunService').RenderStepped:Connect(function()
+    FrameCounter += 1;
+
+    if (tick() - FrameTimer) >= 1 then
+        FPS = FrameCounter;
+        FrameTimer = tick();
+        FrameCounter = 0;
+    end;
+
+    Library:SetWatermark(('catware - %s fps - %s ms'):format(
+        math.floor(FPS),
+        math.floor(game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue())
+    ));
+end);
+
+Library.KeybindFrame.Visible = true;
 
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 MenuGroup:AddButton({ Text = 'Unload', Func = function() Library:Unload() end })
