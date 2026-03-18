@@ -202,8 +202,7 @@ local function attackTRex(targetHrp)
     if not tRexFolder then return end
     local remote = tRexFolder:FindFirstChild("LeftClickRemote")
     if not remote then return end
-    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 1)
-    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 2)
+
     remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 3)
 end
 
@@ -221,9 +220,23 @@ local function attackTRexCustom(targetHrp, direction)
     local remote = tRexFolder:FindFirstChild("LeftClickRemote")
     if not remote then return end
     
-    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 1)
-    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 2)
     remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 3)
+end
+
+local function attackKitsune(targetHrp)
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if not hrp or not targetHrp then return end
+    local direction = (targetHrp.Position - hrp.Position).Unit
+    local kitsuneFolder = character:FindFirstChild("Kitsune-Kitsune")
+    if not kitsuneFolder then
+        local tool = character:FindFirstChildOfClass("Tool")
+        if tool and tool.Name:find("Kitsune-Kitsune") then kitsuneFolder = tool end
+    end
+    if not kitsuneFolder then return end
+    local remote = kitsuneFolder:FindFirstChild("LeftClickRemote")
+    if not remote then return end
+    
+    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 4, true)
 end
 
 local function isUsingTRexFruit()
@@ -235,6 +248,19 @@ local function isUsingTRexFruit()
     if not data then return false end
     for _, obj in ipairs(data:GetChildren()) do
         if obj:IsA("StringValue") and obj.Value == "T-Rex-T-Rex" then return true end
+    end
+    return false
+end
+
+local function isUsingKitsuneFruit()
+    local char = plr.Character
+    if not char then return false end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and tool.Name:find("Kitsune-Kitsune") then return true end
+    local data = plr:FindFirstChild("Data")
+    if not data then return false end
+    for _, obj in ipairs(data:GetChildren()) do
+        if obj:IsA("StringValue") and obj.Value == "Kitsune-Kitsune" then return true end
     end
     return false
 end
@@ -407,6 +433,7 @@ Toggles.KillAuraEnabled:OnChanged(function()
                                             local targetHrp = target:FindFirstChild("HumanoidRootPart")
                                             if targetHrp and (hrp.Position - targetHrp.Position).Magnitude < 1000 then
                                                 targetHum.Health = 0
+                                                targetHum.MaxHealth = 0
                                             end
                                         end
                                     end
@@ -416,12 +443,16 @@ Toggles.KillAuraEnabled:OnChanged(function()
                             end
                         else
                             local currentTool = char:FindFirstChildOfClass("Tool")
+
                             local hasTRexTool = currentTool and currentTool.Name == "T-Rex-T-Rex"
                             local usingTRex = hasTRexTool and isUsingTRexFruit()
 
-                            local canAttackNormally = (not usingTRex) and (spoofWeaponEnabled or (currentTool and currentTool.ToolTip ~= "Gun"))
+                            local hasKitsuneTool = currentTool and currentTool.Name == "Kitsune-Kitsune"
+                            local usingKitsune = hasKitsuneTool and isUsingKitsuneFruit()
 
-                            if usingTRex or canAttackNormally then
+                            local canAttackNormally = (not (usingTRex or usingKitsune)) and (spoofWeaponEnabled or (currentTool and currentTool.ToolTip ~= "Gun"))
+
+                            if usingTRex or usingKitsune or canAttackNormally then
                                 if startTime - lastTargetScan > 0.3 then
                                     cachedTargets = {}
                                     
@@ -470,15 +501,31 @@ Toggles.KillAuraEnabled:OnChanged(function()
                                     
                                     local isSeaBeast = target.Name:sub(1, 8) == "SeaBeast"
 
-                                    if usingTRex and targetHrp then
+                                    if targetHrp then
                                         if isSeaBeast then
-                                            attackTRex(targetHrp)
+                                            if usingKitsune then
+                                                attackKitsune(targetHrp)
+                                            elseif usingTRex then
+                                                attackTRex(targetHrp)
+                                            end
                                         elseif targetsStunned(cachedTargets) then
-                                            attackTRexCustom(targetHrp, Vector3.new(0, -1, 0))
+                                            if usingTRex then
+                                                attackTRexCustom(targetHrp, Vector3.new(0, -1, 0))
+                                            elseif usingKitsune then
+                                                attackKitsune(targetHrp)
+                                            elseif canAttackNormally then
+                                                attack(target)
+                                            end
                                         else
-                                            attackTRex(targetHrp)
+                                            if usingKitsune then
+                                                attackKitsune(targetHrp)
+                                            elseif usingTRex then
+                                                attackTRex(targetHrp)
+                                            elseif canAttackNormally then
+                                                attack(target)
+                                            end
                                         end
-                                    elseif canAttackNormally and targetHrp and not isSeaBeast then
+                                    elseif canAttackNormally then
                                         attack(target)
                                     end
 
@@ -1470,6 +1517,17 @@ local function applyNoclip()
     end
 end
 
+local function takeOwnership()
+    local boat = getCurrentBoat()
+    if not boat then return end
+    
+    for _, part in ipairs(boat:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part:SetNetworkOwner(game.Players.LocalPlayer)
+        end
+    end
+end
+
 local function stopBoatFly(keepEnabled)
     if boatBV and boatBV.Parent then boatBV:Destroy() end
     if boatBG and boatBG.Parent then boatBG:Destroy() end
@@ -1499,6 +1557,8 @@ local function startBoatFly()
             currentSeat.HeadsUpDisplay = false
             workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
         end
+
+        takeOwnership()
         
         boatBV = Instance.new("BodyVelocity")
         boatBV.MaxForce = Vector3.new(9e9,9e9,9e9)
@@ -1830,6 +1890,116 @@ ShopBox:AddButton({
         CommF:InvokeServer("Cousin", "Buy", "DLCBoxData")
     end,
 })
+
+-- ==== Fruit Detector ====
+
+local FruitDetectorBox = Tabs.Misc:AddRightGroupbox('Fruit Detector')
+
+local fruitDetectorEnabled = false
+local currentFruit = nil
+local fruitPosition = nil
+
+local function findFruit()
+    local fruitModel = workspace:FindFirstChild("Fruit")
+    if not fruitModel then return nil, nil end
+    
+    local fruitPart = fruitModel:FindFirstChild("RootPart") or fruitModel:FindFirstChildOfClass("BasePart")
+    
+    if fruitPart then
+        return fruitModel, fruitPart.Position
+    end
+    
+    return fruitModel, nil
+end
+
+task.spawn(function()
+    while task.wait(2) do
+        if fruitDetectorEnabled then
+            local fruit, pos = findFruit()
+            if fruit and not currentFruit then
+                currentFruit = fruit
+                fruitPosition = pos
+                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
+                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
+                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
+            elseif not fruit then
+                currentFruit = nil
+                fruitPosition = nil
+            elseif fruit and currentFruit ~= fruit then
+                currentFruit = fruit
+                fruitPosition = pos
+                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
+                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
+                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
+            elseif fruit and pos then
+                fruitPosition = pos
+            end
+        else
+            currentFruit = nil
+            fruitPosition = nil
+        end
+    end
+end)
+
+local function teleportToFruit()
+    if not fruitPosition then
+        Library:Notify("[FruitDetector] >> No Fruit to teleport to", 6)
+        return
+    end
+    
+    local char = plr.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    hrp.CFrame = CFrame.new(fruitPosition)
+    
+    Library:Notify("[FruitDetector] >> Teleported to fruit!", 6)
+end
+
+FruitDetectorBox:AddToggle('FruitDetectorEnabled', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Detects when a fruit spawns in the game',
+}):AddKeyPicker('FruitDetectorKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Fruit Detector',
+    SyncToggleState = true,
+})
+
+local fruitStatusLabel = FruitDetectorBox:AddLabel('Status: No fruit detected')
+
+FruitDetectorBox:AddButton({
+    Text = 'Teleport to Fruit',
+    Func = teleportToFruit,
+    Tooltip = 'Teleports you to the detected fruit',
+})
+
+task.spawn(function()
+    while task.wait(1) do
+        if fruitDetectorEnabled then
+            if currentFruit and fruitPosition then
+                local distance = plr:DistanceFromCharacter(fruitPosition)
+                fruitStatusLabel:SetText(string.format('Status: Fruit found (%.1f studs away)', distance))
+            else
+                fruitStatusLabel:SetText('Status: No fruit detected')
+            end
+        else
+            fruitStatusLabel:SetText('Status: Disabled')
+        end
+    end
+end)
+
+Toggles.FruitDetectorEnabled:OnChanged(function()
+    fruitDetectorEnabled = Toggles.FruitDetectorEnabled.Value
+    if not fruitDetectorEnabled then
+        currentFruit = nil
+        fruitPosition = nil
+    end
+end)
 
 -- ===== Server =====
 local ServerBox = Tabs.Misc:AddRightGroupbox('Server')
