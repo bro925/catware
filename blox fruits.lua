@@ -235,7 +235,7 @@ local function attackKitsune(targetHrp)
     if not kitsuneFolder then return end
     local remote = kitsuneFolder:FindFirstChild("LeftClickRemote")
     if not remote then return end
-    
+
     remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 4, true)
 end
 
@@ -1517,17 +1517,6 @@ local function applyNoclip()
     end
 end
 
-local function takeOwnership()
-    local boat = getCurrentBoat()
-    if not boat then return end
-    
-    for _, part in ipairs(boat:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part:SetNetworkOwner(game.Players.LocalPlayer)
-        end
-    end
-end
-
 local function stopBoatFly(keepEnabled)
     if boatBV and boatBV.Parent then boatBV:Destroy() end
     if boatBG and boatBG.Parent then boatBG:Destroy() end
@@ -1557,8 +1546,6 @@ local function startBoatFly()
             currentSeat.HeadsUpDisplay = false
             workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
         end
-
-        takeOwnership()
         
         boatBV = Instance.new("BodyVelocity")
         boatBV.MaxForce = Vector3.new(9e9,9e9,9e9)
