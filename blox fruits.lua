@@ -1147,6 +1147,128 @@ plr.CharacterAdded:Connect(function(newChar)
     end
 end)
 
+-- ===== Legendary Sword Dealer Detector =====
+local DealerBox = Tabs.Farming:AddLeftGroupbox('Legendary Sword Dealer Detector')
+
+local dealerEnabled = false
+local dealerSpawned = false
+local dealerPosition = nil
+local DEFAULT_POS = Vector3.new(0, -1000, 0)
+
+local function checkDealer()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Workspace = game:GetService("Workspace")
+    
+    local npcsFolder = Workspace:FindFirstChild("NPCs")
+    local dealerInWorkspace = npcsFolder and npcsFolder:FindFirstChild("Legendary Sword Dealer")
+    
+    if dealerInWorkspace then
+        local hrp = dealerInWorkspace:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            dealerPosition = hrp.Position
+            return true, "workspace"
+        end
+        return true, "workspace"
+    end
+    
+    local dealerInReplicated = ReplicatedStorage:FindFirstChild("NPCs") and 
+                               ReplicatedStorage.NPCs:FindFirstChild("Legendary Sword Dealer")
+    
+    if dealerInReplicated then
+        local hrp = dealerInReplicated:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local isDefault = (hrp.Position - DEFAULT_POS).Magnitude < 0.1
+            if not isDefault then
+                dealerPosition = hrp.Position
+                return true, "replicated"
+            end
+        end
+    end
+    
+    dealerPosition = nil
+    return false, "unknown"
+end
+
+local statusLabel = DealerBox:AddLabel("Status: Disabled")
+
+DealerBox:AddToggle('DealerDetector', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Get notified when the Legendary Sword Dealer spawns',
+})
+
+Toggles.DealerDetector:OnChanged(function()
+    dealerEnabled = Toggles.DealerDetector.Value
+    
+    if dealerEnabled then
+        statusLabel:SetText("Status: Checking...")
+        local spawned = checkDealer()
+        if spawned then
+            dealerSpawned = true
+            if dealerPosition then
+                local distance = plr:DistanceFromCharacter(dealerPosition)
+                statusLabel:SetText(string.format('Status: SPAWNED! (%.1fm)', distance))
+            else
+                statusLabel:SetText("Status: SPAWNED!")
+            end
+        end
+    else
+        statusLabel:SetText("Status: Disabled")
+        dealerSpawned = false
+        dealerPosition = nil
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        
+        if dealerEnabled then
+            local spawned = checkDealer()
+            
+            if spawned and not dealerSpawned then
+                dealerSpawned = true
+                
+                if dealerPosition then
+                    local distance = plr:DistanceFromCharacter(dealerPosition)
+                    statusLabel:SetText(string.format('Status: SPAWNED! (%.1fm)', distance))
+                else
+                    statusLabel:SetText("Status: SPAWNED!")
+                end
+                
+                for i = 1, 20 do
+                    Library:Notify("[LSDDetector] The Dealer has spawned!", 15)
+                end
+                
+            elseif not spawned and dealerSpawned then
+                dealerSpawned = false
+                dealerPosition = nil
+                statusLabel:SetText("Status: Checking...")
+                Library:Notify("[LSDDetector] The Dealer has despawned :(", 15)
+                
+            elseif spawned and dealerSpawned and dealerPosition then
+                local distance = plr:DistanceFromCharacter(dealerPosition)
+                statusLabel:SetText(string.format('Status: SPAWNED! (%.1fm)', distance))
+            end
+        end
+    end
+end)
+
+DealerBox:AddButton({
+    Text = 'Check',
+    Func = function()
+        local spawned = checkDealer()
+        if spawned and dealerPosition then
+            local distance = plr:DistanceFromCharacter(dealerPosition)
+            Library:Notify(string.format("[LSDDetector] The Dealer spawned! (%.1fm)", distance), 5)
+        elseif spawned then
+            Library:Notify("[LSDDetector] The Dealer has spawned!", 15)
+        else
+            Library:Notify("[LSDDetector] The Dealer hasn't spawned", 10)
+        end
+    end,
+})
+
 -- ===== Bring Mobs =====
 local BringMobsBox = Tabs.Farming:AddRightGroupbox('Bring Mobs')
 
@@ -1716,7 +1838,7 @@ task.spawn(function()
             end
             
             if args[1] == "DoubleJump" then
-                if blockDJEnergy and args[2] == "false" then return end
+                if blockDJEnergy and args[2] == false then return end
             end
         end
         return prev(self, ...)
@@ -1865,11 +1987,6 @@ end)
 
 -- ===== Shop =====
 local ShopBox = Tabs.Misc:AddLeftGroupbox('Shop')
-ShopBox:AddDivider()
-
-ShopBox:AddLabel("Fighting Styles")
-
-ShopBox:AddLabel("Misc")
 ShopBox:AddButton({
     Text = 'Roll Fruit',
     Tooltip = 'gambling $$$',
@@ -1878,8 +1995,152 @@ ShopBox:AddButton({
     end,
 })
 
--- ==== Fruit Detector ====
+-- ===== Fruit Shop =====
+local FruitShopBox = Tabs.Misc:AddLeftGroupbox('Fruit Shop')
 
+local container = FruitShopBox.Container
+local layout = container:FindFirstChildOfClass("UIListLayout")
+
+local function clearDynamicContent()
+    if not container then return end
+    
+    for _, child in ipairs(container:GetChildren()) do
+        if child ~= layout then
+            child:Destroy()
+        end
+    end
+end
+
+local function fetchFruitData(isAdvanced)
+    isAdvanced = isAdvanced or false
+    local success, data = pcall(function()
+        return game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer("GetFruits", isAdvanced)
+    end)
+    
+    if success and data then
+        return data
+    end
+    return nil
+end
+
+local function buyFruit(fruitName, isAdvanced)
+    isAdvanced = isAdvanced or false
+    
+    local success, result = pcall(function()
+        return game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer("PurchaseRawFruit", fruitName, isAdvanced)
+    end)
+    
+    if success then
+        Library:Notify("Purchased " .. fruitName .. "!", 5)
+    else
+        Library:Notify("Failed to purchase " .. fruitName .. "!", 5)
+    end
+end
+
+local function create()
+    clearDynamicContent()
+    
+    local refreshBtn = FruitShopBox:AddButton({
+        Text = 'Refresh Stock',
+        Func = function()
+            create()
+            Library:Notify("Refreshed Fruit Stock!", 5)
+        end
+    })
+
+    FruitShopBox:AddDivider()
+    
+    -- normal stock
+    local normalStock = fetchFruitData(false)
+    if normalStock then
+        local hasNormalStock = false
+        for _, fruit in ipairs(normalStock) do
+            if fruit.OnSale and not fruit.Offsale then
+                hasNormalStock = true
+                break
+            end
+        end
+        
+        if hasNormalStock then
+            FruitShopBox:AddLabel("Stock (Normal)")
+            
+            for _, fruit in ipairs(normalStock) do
+                if fruit.OnSale and not fruit.Offsale then
+                    local btn = FruitShopBox:AddButton({
+                        Text = fruit.Name,
+                        Func = function()
+                            Library:Notify(string.format("%s\nPrice: %d Beli\nRarity: %s", 
+                                fruit.Name, fruit.Price,
+                                fruit.Rarity == 0 and "Common" or
+                                fruit.Rarity == 1 and "Uncommon" or
+                                fruit.Rarity == 2 and "Rare" or
+                                fruit.Rarity == 3 and "Legendary" or
+                                fruit.Rarity == 4 and "Mythical" or "Unknown"), 5)
+                        end,
+                    })
+                    
+                    btn:AddButton({
+                        Text = "Buy Fruit",
+                        Func = function()
+                            buyFruit(fruit.Name, false)
+                        end,
+                        DoubleClick = true,
+                    })
+                end
+            end
+        end
+    end
+    
+    -- advanced stock
+    local advancedStock = fetchFruitData(true)
+    if advancedStock then
+        local hasAdvancedStock = false
+        for _, fruit in ipairs(advancedStock) do
+            if fruit.OnSale and not fruit.Offsale then
+                hasAdvancedStock = true
+                break
+            end
+        end
+        
+        if hasAdvancedStock then
+            FruitShopBox:AddDivider()
+            FruitShopBox:AddLabel("Stock (Advanced)")
+            
+            for _, fruit in ipairs(advancedStock) do
+                if fruit.OnSale and not fruit.Offsale then
+                    local btn = FruitShopBox:AddButton({
+                        Text = fruit.Name,
+                        Func = function()
+                            Library:Notify(string.format("%s\nPrice: %d Beli\nRarity: %s", 
+                                fruit.Name, fruit.Price,
+                                fruit.Rarity == 0 and "Common" or
+                                fruit.Rarity == 1 and "Uncommon" or
+                                fruit.Rarity == 2 and "Rare" or
+                                fruit.Rarity == 3 and "Legendary" or
+                                fruit.Rarity == 4 and "Mythical" or "Unknown"), 5)
+                        end,
+                    })
+                    
+                    btn:AddButton({
+                        Text = "Buy Fruit",
+                        Func = function()
+                            buyFruit(fruit.Name, true)
+                        end,
+                        DoubleClick = true,
+                    })
+                end
+            end
+        end
+    end
+    
+    FruitShopBox:Resize()
+end
+
+create()
+
+-- // ============================================================== Misc Tab ============================================================== \\ --
+
+-- ===== Fruit Detector =====
 local FruitDetectorBox = Tabs.Misc:AddRightGroupbox('Fruit Detector')
 
 local fruitDetectorEnabled = false
@@ -1887,37 +2148,80 @@ local currentFruit = nil
 local fruitPosition = nil
 
 local function findFruit()
-    local fruitModel = workspace:FindFirstChild("Fruit")
-    if not fruitModel then return nil, nil end
-    
-    local fruitPart = fruitModel:FindFirstChild("RootPart") or fruitModel:FindFirstChildOfClass("BasePart")
-    
-    if fruitPart then
-        return fruitModel, fruitPart.Position
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") and obj.Name == "Fruit" then
+            local fruitPart = obj:FindFirstChild("RootPart") or 
+                             obj:FindFirstChildOfClass("BasePart")
+            
+            if fruitPart then
+                return obj, fruitPart.Position
+            end
+            return obj, nil
+        end
+    end
+    return nil, nil
+end
+
+local function pickFruit()
+    if not currentFruit then
+        Library:Notify("[FruitDetector] >> No fruit to pick", 3)
+        return
     end
     
-    return fruitModel, nil
+    local touchTransmitter = nil
+    local fruitPart = nil
+    
+    for _, obj in ipairs(currentFruit:GetDescendants()) do
+        if obj:IsA("TouchTransmitter") then
+            touchTransmitter = obj
+            fruitPart = obj.Parent
+            break
+        end
+    end
+    
+    if not touchTransmitter or not fruitPart then
+        Library:Notify("[FruitDetector] >> No TouchTransmitter found", 5)
+        return
+    end
+    
+    local success = pcall(function()
+        touchTransmitter:Fire(characterPart)
+    end)
+    
+    if success then
+        Library:Notify("[FruitDetector] >> Picked up fruit!", 5)
+        currentFruit = nil
+        fruitPosition = nil
+    else
+        Library:Notify("[FruitDetector] >> Failed to pick fruit", 5)
+    end
 end
 
 task.spawn(function()
-    while task.wait(2) do
+    while task.wait(1) do
         if fruitDetectorEnabled then
             local fruit, pos = findFruit()
+            
             if fruit and not currentFruit then
                 currentFruit = fruit
                 fruitPosition = pos
-                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
-                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
-                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
+                
+                for i = 1, 20 do
+                    Library:Notify("[FruitDetector] >> A Fruit has spawned!", 5)
+                end
+                
             elseif not fruit then
                 currentFruit = nil
                 fruitPosition = nil
+                
             elseif fruit and currentFruit ~= fruit then
                 currentFruit = fruit
                 fruitPosition = pos
-                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
-                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
-                Library:Notify("[FruitDetector] >> A Fruit has spawned!", 10)
+                
+                for i = 1, 20 do
+                    Library:Notify("[FruitDetector] >> A Fruit has spawned!", 5)
+                end
+                
             elseif fruit and pos then
                 fruitPosition = pos
             end
@@ -1927,23 +2231,6 @@ task.spawn(function()
         end
     end
 end)
-
-local function teleportToFruit()
-    if not fruitPosition then
-        Library:Notify("[FruitDetector] >> No Fruit to teleport to", 6)
-        return
-    end
-    
-    local char = plr.Character
-    if not char then return end
-    
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    hrp.CFrame = CFrame.new(fruitPosition)
-    
-    Library:Notify("[FruitDetector] >> Teleported to fruit!", 6)
-end
 
 FruitDetectorBox:AddToggle('FruitDetectorEnabled', {
     Text = 'Enabled',
@@ -1960,9 +2247,9 @@ FruitDetectorBox:AddToggle('FruitDetectorEnabled', {
 local fruitStatusLabel = FruitDetectorBox:AddLabel('Status: No fruit detected')
 
 FruitDetectorBox:AddButton({
-    Text = 'Teleport to Fruit',
-    Func = teleportToFruit,
-    Tooltip = 'Teleports you to the detected fruit',
+    Text = 'Pick Fruit',
+    Func = pickFruit,
+    Tooltip = 'Automatically picks up the detected fruit',
 })
 
 task.spawn(function()
@@ -1970,7 +2257,7 @@ task.spawn(function()
         if fruitDetectorEnabled then
             if currentFruit and fruitPosition then
                 local distance = plr:DistanceFromCharacter(fruitPosition)
-                fruitStatusLabel:SetText(string.format('Status: Fruit found (%.1f studs away)', distance))
+                fruitStatusLabel:SetText(string.format('Status: Fruit found (%.1fm)', distance))
             else
                 fruitStatusLabel:SetText('Status: No fruit detected')
             end
@@ -1987,6 +2274,23 @@ Toggles.FruitDetectorEnabled:OnChanged(function()
         fruitPosition = nil
     end
 end)
+
+-- ===== Teams =====
+local TeamsBox = Tabs.Misc:AddRightGroupbox('Teams')
+TeamsBox:AddButton({
+    Text = 'Switch to Marines',
+    Tooltip = 'Switches to the Marines team',
+    Func = function()
+        CommF:InvokeServer("SetTeam", "Marines")
+    end,
+})
+TeamsBox:AddButton({
+    Text = 'Switch to Pirates',
+    Tooltip = 'Switches to the Pirates team',
+    Func = function()
+        CommF:InvokeServer("SetTeam", "Pirates")
+    end,
+})
 
 -- ===== Server =====
 local ServerBox = Tabs.Misc:AddRightGroupbox('Server')
@@ -2036,23 +2340,6 @@ ServerBox:AddButton({
     Text = 'Rejoin Server',
     Func = function()
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
-    end,
-})
-
--- ===== Teams =====
-local TeamsBox = Tabs.Misc:AddLeftGroupbox('Teams')
-TeamsBox:AddButton({
-    Text = 'Switch to Marines',
-    Tooltip = 'Switches to the Marines team',
-    Func = function()
-        CommF:InvokeServer("SetTeam", "Marines")
-    end,
-})
-TeamsBox:AddButton({
-    Text = 'Switch to Pirates',
-    Tooltip = 'Switches to the Pirates team',
-    Func = function()
-        CommF:InvokeServer("SetTeam", "Pirates")
     end,
 })
 
