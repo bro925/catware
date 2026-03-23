@@ -240,6 +240,23 @@ local function attackKitsune(targetHrp)
     remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 4, true)
 end
 
+local function attackKitsuneCustom(targetHrp, direction)
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if not hrp or not targetHrp then return end
+    
+    local kitsuneFolder = character:FindFirstChild("Kitsune-Kitsune")
+    if not kitsuneFolder then
+        local tool = character:FindFirstChildOfClass("Tool")
+        if tool and tool.Name:find("Kitsune-Kitsune") then kitsuneFolder = tool end
+    end
+    if not kitsuneFolder then return end
+    
+    local remote = kitsuneFolder:FindFirstChild("LeftClickRemote")
+    if not remote then return end
+    
+    remote:FireServer(vector.create(direction.X, direction.Y, direction.Z), 4, true)
+end
+
 local function isUsingTRexFruit()
     local char = plr.Character
     if not char then return false end
@@ -347,7 +364,7 @@ KillAuraBox:AddSlider('KillAuraRange', {
     Text = 'Aura Range',
     Default = 50,
     Min = 1,
-    Max = 60,
+    Max = 500,
     Rounding = 0,
     Suffix = ' studs',
 })
@@ -513,7 +530,7 @@ Toggles.KillAuraEnabled:OnChanged(function()
                                             if usingTRex then
                                                 attackTRexCustom(targetHrp, Vector3.new(0, -1, 0))
                                             elseif usingKitsune then
-                                                attackKitsune(targetHrp)
+                                                attackKitsuneCustom(targetHrp, Vector3.new(0, -1, 0))
                                             elseif canAttackNormally then
                                                 attack(target)
                                             end
