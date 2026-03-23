@@ -14,10 +14,10 @@ local Window = Library:CreateWindow({
 local Tabs = {
     Combat = Window:AddTab('Combat'),
     Farming = Window:AddTab('Farming'),
+    Visuals = Window:AddTab('Visuals'),
     Movement = Window:AddTab('Movement'),
     Player = Window:AddTab('Player'),
     Misc = Window:AddTab('Misc'),
-    Teleport = Window:AddTab('Teleport'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
 
@@ -33,6 +33,7 @@ local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 local CommE = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommE")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
+local LightingService = game:GetService("Lighting")
 
 local plr = game.Players.LocalPlayer
 local character = plr.Character or plr.CharacterAdded:Wait()
@@ -480,7 +481,7 @@ Toggles.KillAuraEnabled:OnChanged(function()
                                         end
                                     end
                                     
-                                    if auraTargetTypes and auraTargetTypes['Sea Beasts'] and seaBeastsFolder and usingTRex then
+                                    if auraTargetTypes and auraTargetTypes['Sea Beasts'] and seaBeastsFolder and (usingTRex or usingKitsune) then
                                         for _, beast in ipairs(seaBeastsFolder:GetChildren()) do
                                             if beast:IsA("Model") and beast.Name:sub(1, 8) == "SeaBeast" then
                                                 local beastHrp = beast:FindFirstChild("HumanoidRootPart")
@@ -1237,14 +1238,14 @@ task.spawn(function()
                 end
                 
                 for i = 1, 20 do
-                    Library:Notify("[LSDDetector] The Dealer has spawned!", 15)
+                    Library:Notify("[LSDDetector] >> The Dealer has spawned!", 15)
                 end
                 
             elseif not spawned and dealerSpawned then
                 dealerSpawned = false
                 dealerPosition = nil
                 statusLabel:SetText("Status: Checking...")
-                Library:Notify("[LSDDetector] The Dealer has despawned :(", 15)
+                Library:Notify("[LSDDetector] >> The Dealer has despawned :(", 15)
                 
             elseif spawned and dealerSpawned and dealerPosition then
                 local distance = plr:DistanceFromCharacter(dealerPosition)
@@ -1260,11 +1261,11 @@ DealerBox:AddButton({
         local spawned = checkDealer()
         if spawned and dealerPosition then
             local distance = plr:DistanceFromCharacter(dealerPosition)
-            Library:Notify(string.format("[LSDDetector] The Dealer spawned! (%.1fm)", distance), 5)
+            Library:Notify(string.format("[LSDDetector] >> The Dealer has spawned! (%.1fm)", distance), 5)
         elseif spawned then
-            Library:Notify("[LSDDetector] The Dealer has spawned!", 15)
+            Library:Notify("[LSDDetector] >> The Dealer has spawned!", 15)
         else
-            Library:Notify("[LSDDetector] The Dealer hasn't spawned", 10)
+            Library:Notify("[LSDDetector] >> The Dealer hasn't spawned", 10)
         end
     end,
 })
@@ -1275,6 +1276,7 @@ local BringMobsBox = Tabs.Farming:AddRightGroupbox('Bring Mobs')
 local bringMobsEnabled = false
 local bringBossesEnabled = false
 local bringRange = 300
+local bringDistance = 6
 
 BringMobsBox:AddToggle('BringMobs', {
     Text = 'Enabled',
@@ -1296,31 +1298,77 @@ BringBossesDepbox:AddToggle('BringBosses', {
 })
 BringBossesDepbox:SetupDependencies({ {Toggles.BringMobs, true} })
 
+BringMobsBox:AddSlider('BringDistance', {
+    Text = 'Bring Distance',
+    Default = 6,
+    Min = 3,
+    Max = 15,
+    Rounding = 1,
+    Suffix = ' studs',
+})
+
 Toggles.BringMobs:OnChanged(function() bringMobsEnabled = Toggles.BringMobs.Value end)
 Toggles.BringBosses:OnChanged(function() bringBossesEnabled = Toggles.BringBosses.Value end)
+Options.BringDistance:OnChanged(function() bringDistance = Options.BringDistance.Value end)
 
-local sethiddenproperty = sethiddenproperty or function(...) return ... end
+local function teleportMob(mRoot, targetPos)
+    if not mRoot then return end
+    
+    mRoot.AssemblyLinearVelocity = Vector3.zero
+    mRoot.AssemblyAngularVelocity = Vector3.zero
+    
+    mRoot.CFrame = CFrame.new(targetPos)
+    
+    local rootPart = mRoot.Parent:FindFirstChild("RootPart")
+    if rootPart and rootPart ~= mRoot then
+        rootPart.AssemblyLinearVelocity = Vector3.zero
+        rootPart.AssemblyAngularVelocity = Vector3.zero
+        rootPart.CFrame = CFrame.new(targetPos)
+    end
+    
+    task.wait()
+    mRoot.AssemblyLinearVelocity = Vector3.zero
+    mRoot.AssemblyAngularVelocity = Vector3.zero
+end
+
 task.spawn(function()
-    while task.wait(0) do
+    local lastPullTimes = {}
+    
+    while task.wait(0.1) do
         if bringMobsEnabled and character and character:FindFirstChild("HumanoidRootPart") then
-            pcall(sethiddenproperty, plr, "SimulationRadius", math.huge)
             local root = character.HumanoidRootPart
+            local currentTime = tick()
+            
             for _, mob in pairs(workspace.Enemies:GetChildren()) do
                 local mRoot = mob:FindFirstChild("HumanoidRootPart")
                 local mHum = mob:FindFirstChild("Humanoid")
+                
                 if mRoot and mHum and mHum.Health > 0 then
                     local dist = (mRoot.Position - root.Position).Magnitude
+                    
                     if dist <= bringRange then
                         local isBoss = mob:GetAttribute("IsBoss") == true
-                        if not isBoss or (isBoss and bringBossesEnabled) then
-                            local targetPos = root.Position + Vector3.new(0, 9, 9)
-                            mRoot.CFrame = CFrame.lookAt(targetPos, targetPos + Vector3.new(0, 1, 0))
-                            mRoot.CanCollide = false
-                            mRoot.AssemblyLinearVelocity = Vector3.zero
-                            mRoot.AssemblyAngularVelocity = Vector3.zero
-                            mHum:ChangeState(Enum.HumanoidStateType.Running)
+                        
+                        if not isBoss or bringBossesEnabled then
+                            local targetPos = root.Position + (root.CFrame.LookVector * bringDistance)
+                            
+                            local currentDistToTarget = (mRoot.Position - targetPos).Magnitude
+                            
+                            if currentDistToTarget > 3 then
+                                local lastPull = lastPullTimes[mob] or 0
+                                if currentTime - lastPull > 0.2 then
+                                    teleportMob(mRoot, targetPos)
+                                    lastPullTimes[mob] = currentTime
+                                end
+                            end
                         end
                     end
+                end
+            end
+            
+            for mob, time in pairs(lastPullTimes) do
+                if not mob or not mob.Parent then
+                    lastPullTimes[mob] = nil
                 end
             end
         end
@@ -1365,6 +1413,223 @@ QuestBox:AddButton({
         end
     end,
 })
+
+-- // ============================================================== Visuals Tab ============================================================== \\ --
+local CameraBox = Tabs.Visuals:AddLeftGroupbox('Camera')
+local camEnabled = false
+local colorCorrectionObjects = {"GlobalColorCorrection", "RainCorrection", "SubmergedColorCorrection", "SeaTerrorCC"}
+
+CameraBox:AddToggle('Camera', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = "Modifies your camera's behavior",
+}):AddKeyPicker('CameraKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Camera',
+    SyncToggleState = true,
+})
+
+CameraBox:AddToggle('DisableColorCorrection', {
+    Text = 'Disable Color Correction',
+    Default = false,
+    Tooltip = 'Disables color correction?'
+})
+
+CameraBox:AddToggle('RevertSky', {
+    Text = 'Old Skybox',
+    Default = false,
+    Tooltip = "Revert to Roblox's old skybox (also removes fog for some reason)"
+})
+
+task.spawn(function()
+    while true do
+        task.wait()
+        
+        -- color correction
+        local colorCorrectionEnabled = Toggles.Camera.Value and Toggles.DisableColorCorrection.Value
+        
+        for _, ccName in ipairs(colorCorrectionObjects) do
+            local cc = LightingService:FindFirstChild(ccName)
+            if cc then
+                if colorCorrectionEnabled then
+                    if cc.Parent ~= workspace then
+                        cc.Parent = workspace
+                    end
+                else
+                    if cc.Parent ~= LightingService then
+                        cc.Parent = LightingService
+                    end
+                end
+            end
+        end
+        
+        -- old skybox
+        local skyEnabled = Toggles.Camera.Value and Toggles.RevertSky.Value
+        local sky = LightingService:FindFirstChild("Sky")
+        if sky then
+            if skyEnabled then
+                if sky.Parent ~= workspace then
+                    sky.Parent = workspace
+                end
+            else
+                if sky.Parent ~= LightingService then
+                    sky.Parent = LightingService
+                end
+            end
+        end
+    end
+end)
+
+local FullbrightBox = Tabs.Visuals:AddRightGroupbox('Fullbright')
+local originalBrightness = LightingService.Brightness
+
+FullbrightBox:AddToggle('Fullbright', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = 'Brights up the game to see better',
+}):AddKeyPicker('FBKeybind', {
+    Default = 'None',
+    NoUI = false,
+    Mode = 'Toggle',
+    Text = 'Fullbright',
+    SyncToggleState = true,
+})
+
+FullbrightBox:AddSlider('BrightnessSlider', {
+    Text = 'Brightness',
+    Default = 4,
+    Min = 0,
+    Max = 5,
+    Rounding = 0,
+})
+
+task.spawn(function()
+    while true do
+        local fullbrightEnabled = Toggles.Fullbright.Value
+        local targetBrightness = Options.BrightnessSlider.Value
+        
+        if fullbrightEnabled then
+            if LightingService.Brightness ~= targetBrightness then
+                LightingService.Brightness = targetBrightness
+            end
+        else
+            if LightingService.Brightness ~= originalBrightness then
+                LightingService.Brightness = originalBrightness
+            end
+        end
+        
+        task.wait()
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if not Toggles.Fullbright.Value then
+            originalBrightness = LightingService.Brightness
+        end
+        task.wait(1)
+    end
+end)
+
+-- ===== Kitsune Color =====
+local KitsuneColorBox = Tabs.Visuals:AddLeftGroupbox('Kitsune Color')
+local kitsuneColorEnabled = false
+local originalColor1 = nil
+local rainbowHue = 0
+local rainbowSpeed = 1
+
+KitsuneColorBox:AddToggle('KitsuneColor', {
+    Text = 'Enabled',
+    Default = false,
+    Tooltip = "Changes the Kitsune Fruit's Color",
+})
+
+KitsuneColorBox:AddLabel('Color'):AddColorPicker('KitsuneColorPicker', {
+    Default = Color3.fromRGB(150, 0, 0),
+    Title = 'Kitsune Color',
+    Transparency = 0,
+})
+
+KitsuneColorBox:AddToggle('KitsuneRainbow', {
+    Text = 'Rainbow Color',
+    Default = false,
+    Tooltip = 'lgbt',
+})
+
+local RainbowDepbox = KitsuneColorBox:AddDependencyBox()
+RainbowDepbox:AddSlider('KitsuneRainbowSpeed', {
+    Text = 'Rainbow Speed',
+    Default = 1,
+    Min = 0.5,
+    Max = 5,
+    Rounding = 1,
+    Suffix = 'x',
+})
+RainbowDepbox:SetupDependencies({ {Toggles.KitsuneRainbow, true} })
+
+task.spawn(function()
+    local lastTime = tick()
+    
+    while true do
+        if Toggles.KitsuneRainbow.Value and Toggles.KitsuneColor.Value then
+            local currentTime = tick()
+            local deltaTime = currentTime - lastTime
+            lastTime = currentTime
+            
+            rainbowHue = (rainbowHue + (rainbowSpeed * deltaTime * 0.5)) % 1
+            
+            local rainbowColor = Color3.fromHSV(rainbowHue, 1, 1)
+            
+            local kitsuneFolder = plr:FindFirstChild("KitsuneFruitVFXColor")
+            if kitsuneFolder then
+                local shifted = kitsuneFolder:FindFirstChild("Shifted")
+                if shifted then
+                    shifted:SetAttribute("Shifted_Color1", rainbowColor)
+                end
+            end
+        else
+            lastTime = tick()
+        end
+        task.wait()
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait()
+        
+        local kitsuneEnabled = Toggles.KitsuneColor.Value
+        local rainbowEnabled = Toggles.KitsuneRainbow.Value
+        local kitsuneFolder = plr:FindFirstChild("KitsuneFruitVFXColor")
+        
+        if kitsuneFolder then
+            local shifted = kitsuneFolder:FindFirstChild("Shifted")
+            
+            if shifted then
+                if originalColor1 == nil and shifted:GetAttribute("Shifted_Color1") then
+                    originalColor1 = shifted:GetAttribute("Shifted_Color1")
+                end
+                
+                if kitsuneEnabled then
+                    if not rainbowEnabled then
+                        local selectedColor = Options.KitsuneColorPicker.Value
+                        shifted:SetAttribute("Shifted_Color1", selectedColor)
+                    end
+                else
+                    if originalColor1 then
+                        shifted:SetAttribute("Shifted_Color1", originalColor1)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+Options.KitsuneRainbowSpeed:OnChanged(function()
+    rainbowSpeed = Options.KitsuneRainbowSpeed.Value
+end)
 
 -- // ============================================================== Movement Tab ============================================================== \\ --
 
@@ -1500,10 +1765,6 @@ local function getNearestPlayer()
         end
     end
     return nearest
-end
-
-local function slyPort()
-
 end
 
 SlyPortBox:AddToggle('SlyPortEnabled', {
@@ -2138,154 +2399,101 @@ end
 
 create()
 
--- // ============================================================== Misc Tab ============================================================== \\ --
+-- ===== Trolling =====
+local TrollingBox = Tabs.Misc:AddRightGroupbox('Trolling')
 
--- ===== Fruit Detector =====
-local FruitDetectorBox = Tabs.Misc:AddRightGroupbox('Fruit Detector')
+local selectedTpBoat = nil
+local boatMap = {}
 
-local fruitDetectorEnabled = false
-local currentFruit = nil
-local fruitPosition = nil
-
-local function findFruit()
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and obj.Name == "Fruit" then
-            local fruitPart = obj:FindFirstChild("RootPart") or 
-                             obj:FindFirstChildOfClass("BasePart")
-            
-            if fruitPart then
-                return obj, fruitPart.Position
-            end
-            return obj, nil
-        end
+local function getBoatList()
+    local list = {}
+    boatMap = {}
+    local boatsFolder = workspace:FindFirstChild("Boats")
+    if not boatsFolder then return list end
+    for _, boat in ipairs(boatsFolder:GetChildren()) do
+        local ownerVal = boat:FindFirstChild("Owner")
+        local owner = ownerVal and tostring(ownerVal.Value) or "Unknown"
+        local label = boat.Name.." ("..owner..")"
+        table.insert(list, label)
+        boatMap[label] = boat
     end
-    return nil, nil
+    return list
 end
 
-local function pickFruit()
-    if not currentFruit then
-        Library:Notify("[FruitDetector] >> No fruit to pick", 3)
-        return
+local function getAvailableSeat(boat)
+    for _, v in ipairs(boat:GetDescendants()) do
+        if (v:IsA("Seat") or v:IsA("VehicleSeat")) and not v:FindFirstChild("SeatWeld") then return v end
     end
-    
-    local touchTransmitter = nil
-    local fruitPart = nil
-    
-    for _, obj in ipairs(currentFruit:GetDescendants()) do
-        if obj:IsA("TouchTransmitter") then
-            touchTransmitter = obj
-            fruitPart = obj.Parent
-            break
-        end
-    end
-    
-    if not touchTransmitter or not fruitPart then
-        Library:Notify("[FruitDetector] >> No TouchTransmitter found", 5)
-        return
-    end
-    
-    local success = pcall(function()
-        touchTransmitter:Fire(characterPart)
-    end)
-    
-    if success then
-        Library:Notify("[FruitDetector] >> Picked up fruit!", 5)
-        currentFruit = nil
-        fruitPosition = nil
-    else
-        Library:Notify("[FruitDetector] >> Failed to pick fruit", 5)
-    end
+    return nil
 end
 
-task.spawn(function()
-    while task.wait(1) do
-        if fruitDetectorEnabled then
-            local fruit, pos = findFruit()
-            
-            if fruit and not currentFruit then
-                currentFruit = fruit
-                fruitPosition = pos
-                
-                for i = 1, 20 do
-                    Library:Notify("[FruitDetector] >> A Fruit has spawned!", 5)
-                end
-                
-            elseif not fruit then
-                currentFruit = nil
-                fruitPosition = nil
-                
-            elseif fruit and currentFruit ~= fruit then
-                currentFruit = fruit
-                fruitPosition = pos
-                
-                for i = 1, 20 do
-                    Library:Notify("[FruitDetector] >> A Fruit has spawned!", 5)
-                end
-                
-            elseif fruit and pos then
-                fruitPosition = pos
-            end
-        else
-            currentFruit = nil
-            fruitPosition = nil
-        end
-    end
-end)
+local initialBoatList = getBoatList()
+if #initialBoatList == 0 then initialBoatList = {"None"} end
 
-FruitDetectorBox:AddToggle('FruitDetectorEnabled', {
-    Text = 'Enabled',
-    Default = false,
-    Tooltip = 'Detects when a fruit spawns in the game',
-}):AddKeyPicker('FruitDetectorKeybind', {
-    Default = 'None',
-    NoUI = false,
-    Mode = 'Toggle',
-    Text = 'Fruit Detector',
-    SyncToggleState = true,
+TrollingBox:AddDivider()
+TrollingBox:AddLabel("Boat Teleport")
+
+TrollingBox:AddDropdown('BoatTpSelect', {
+    Text = 'Select Boat',
+    Values = initialBoatList,
+    Default = 1,
+    Tooltip = 'Pick a boat to teleport',
+})
+Options.BoatTpSelect:OnChanged(function() selectedTpBoat = Options.BoatTpSelect.Value end)
+selectedTpBoat = initialBoatList[1]
+
+TrollingBox:AddButton({
+    Text = 'Refresh Boat List',
+    Func = function()
+        local newList = getBoatList()
+        if #newList == 0 then newList = {"None"} end
+        Options.BoatTpSelect:SetValues(newList)
+        Options.BoatTpSelect:SetValue(newList[1])
+        selectedTpBoat = newList[1]
+        Library:Notify("Refreshed boat list!", 3)
+    end,
 })
 
-local fruitStatusLabel = FruitDetectorBox:AddLabel('Status: No fruit detected')
-
-FruitDetectorBox:AddButton({
-    Text = 'Pick Fruit',
-    Func = pickFruit,
-    Tooltip = 'Automatically picks up the detected fruit',
-})
-
-task.spawn(function()
-    while task.wait(1) do
-        if fruitDetectorEnabled then
-            if currentFruit and fruitPosition then
-                local distance = plr:DistanceFromCharacter(fruitPosition)
-                fruitStatusLabel:SetText(string.format('Status: Fruit found (%.1fm)', distance))
-            else
-                fruitStatusLabel:SetText('Status: No fruit detected')
-            end
-        else
-            fruitStatusLabel:SetText('Status: Disabled')
+TrollingBox:AddButton({
+    Text = 'Teleport Boat',
+    Func = function()
+        if not selectedTpBoat or selectedTpBoat == "None" then
+            Library:Notify("Select a boat first!", 5) return
         end
-    end
-end)
-
-Toggles.FruitDetectorEnabled:OnChanged(function()
-    fruitDetectorEnabled = Toggles.FruitDetectorEnabled.Value
-    if not fruitDetectorEnabled then
-        currentFruit = nil
-        fruitPosition = nil
-    end
-end)
+        local boat = boatMap[selectedTpBoat]
+        if not boat or not boat.Parent then Library:Notify("Boat not found!", 5) return end
+        local char = plr.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChild("Humanoid")
+        if not hrp or not hum then Library:Notify("Character not ready!", 5) return end
+        local seat = getAvailableSeat(boat)
+        if not seat then Library:Notify("No available seats!", 5) return end
+        if (seat.Position - hrp.Position).Magnitude < 1000 then
+            Library:Notify("Boat is too close! Must be at least 1000 studs away.", 5) return
+        end
+        hrp.CFrame = seat.CFrame
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        task.spawn(function()
+            local attempts = 0
+            repeat task.wait(0.1) attempts = attempts + 1 until hum.SeatPart ~= nil or attempts >= 15
+            if hum.SeatPart then Library:Notify("Teleported boat!", 5)
+            else Library:Notify("Failed to sit, try again!", 5) end
+        end)
+    end,
+})
 
 -- ===== Teams =====
 local TeamsBox = Tabs.Misc:AddRightGroupbox('Teams')
 TeamsBox:AddButton({
-    Text = 'Switch to Marines',
+    Text = 'Join Marines',
     Tooltip = 'Switches to the Marines team',
     Func = function()
         CommF:InvokeServer("SetTeam", "Marines")
     end,
 })
 TeamsBox:AddButton({
-    Text = 'Switch to Pirates',
+    Text = 'Join Pirates',
     Tooltip = 'Switches to the Pirates team',
     Func = function()
         CommF:InvokeServer("SetTeam", "Pirates")
@@ -2340,89 +2548,6 @@ ServerBox:AddButton({
     Text = 'Rejoin Server',
     Func = function()
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
-    end,
-})
-
--- // ============================================================== Teleport Tab ============================================================== \\ --
-
--- ===== Boat Teleport =====
-local BoatTpBox = Tabs.Teleport:AddLeftGroupbox('Boat Teleport')
-
-local selectedTpBoat = nil
-local boatMap = {}
-
-local function getBoatList()
-    local list = {}
-    boatMap = {}
-    local boatsFolder = workspace:FindFirstChild("Boats")
-    if not boatsFolder then return list end
-    for _, boat in ipairs(boatsFolder:GetChildren()) do
-        local ownerVal = boat:FindFirstChild("Owner")
-        local owner = ownerVal and tostring(ownerVal.Value) or "Unknown"
-        local label = boat.Name.." ("..owner..")"
-        table.insert(list, label)
-        boatMap[label] = boat
-    end
-    return list
-end
-
-local function getAvailableSeat(boat)
-    for _, v in ipairs(boat:GetDescendants()) do
-        if (v:IsA("Seat") or v:IsA("VehicleSeat")) and not v:FindFirstChild("SeatWeld") then return v end
-    end
-    return nil
-end
-
-local initialBoatList = getBoatList()
-if #initialBoatList == 0 then initialBoatList = {"None"} end
-
-BoatTpBox:AddDropdown('BoatTpSelect', {
-    Text = 'Select Boat',
-    Values = initialBoatList,
-    Default = 1,
-    Tooltip = 'Pick a boat to teleport',
-})
-Options.BoatTpSelect:OnChanged(function() selectedTpBoat = Options.BoatTpSelect.Value end)
-selectedTpBoat = initialBoatList[1]
-
-BoatTpBox:AddButton({
-    Text = 'Refresh Boat List',
-    Func = function()
-        local newList = getBoatList()
-        if #newList == 0 then newList = {"None"} end
-        Options.BoatTpSelect:SetValues(newList)
-        Options.BoatTpSelect:SetValue(newList[1])
-        selectedTpBoat = newList[1]
-        Library:Notify("Refreshed boat list!", 3)
-    end,
-})
-
-BoatTpBox:AddButton({
-    Text = 'Teleport Boat',
-    Func = function()
-        if not selectedTpBoat or selectedTpBoat == "None" then
-            Library:Notify("Select a boat first!", 5) return
-        end
-        local boat = boatMap[selectedTpBoat]
-        if not boat or not boat.Parent then Library:Notify("Boat not found!", 5) return end
-        local char = plr.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChild("Humanoid")
-        if not hrp or not hum then Library:Notify("Character not ready!", 5) return end
-        local seat = getAvailableSeat(boat)
-        if not seat then Library:Notify("No available seats!", 5) return end
-        if (seat.Position - hrp.Position).Magnitude < 1000 then
-            Library:Notify("Boat is too close! Must be at least 1000 studs away.", 5) return
-        end
-        hrp.CFrame = seat.CFrame
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
-        task.spawn(function()
-            local attempts = 0
-            repeat task.wait(0.1) attempts = attempts + 1 until hum.SeatPart ~= nil or attempts >= 15
-            if hum.SeatPart then Library:Notify("Teleported boat!", 5)
-            else Library:Notify("Failed to sit, try again!", 5) end
-        end)
     end,
 })
 
