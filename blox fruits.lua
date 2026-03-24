@@ -530,7 +530,11 @@ Toggles.KillAuraEnabled:OnChanged(function()
                                             if usingTRex then
                                                 attackTRexCustom(targetHrp, Vector3.new(0, -1, 0))
                                             elseif usingKitsune then
-                                                attackKitsuneCustom(targetHrp, Vector3.new(0, -1, 0))
+                                                local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                                                if hrp and targetHrp then
+                                                    local directionToPlayer = (hrp.Position - targetHrp.Position).Unit
+                                                    attackKitsuneCustom(targetHrp, directionToPlayer)
+                                                end
                                             elseif canAttackNormally then
                                                 attack(target)
                                             end
@@ -1294,6 +1298,7 @@ local bringMobsEnabled = false
 local bringBossesEnabled = false
 local bringRange = 300
 local bringDistance = 6
+local bringLerpSpeed = 10
 
 BringMobsBox:AddToggle('BringMobs', {
     Text = 'Enabled',
@@ -1319,38 +1324,81 @@ BringMobsBox:AddSlider('BringDistance', {
     Text = 'Bring Distance',
     Default = 6,
     Min = 3,
-    Max = 15,
+    Max = 20,
     Rounding = 1,
     Suffix = ' studs',
+})
+
+BringMobsBox:AddSlider('BringLerpSpeed', {
+    Text = 'Bring Speed',
+    Default = 10,
+    Min = 5,
+    Max = 50,
+    Rounding = 1,
 })
 
 Toggles.BringMobs:OnChanged(function() bringMobsEnabled = Toggles.BringMobs.Value end)
 Toggles.BringBosses:OnChanged(function() bringBossesEnabled = Toggles.BringBosses.Value end)
 Options.BringDistance:OnChanged(function() bringDistance = Options.BringDistance.Value end)
+Options.BringLerpSpeed:OnChanged(function() bringLerpSpeed = Options.BringLerpSpeed.Value end)
 
-local function teleportMob(mRoot, targetPos)
+local activeMobs = {}
+
+local function lerpMob(mob, targetPos)
+    local mRoot = mob:FindFirstChild("HumanoidRootPart")
     if not mRoot then return end
     
-    mRoot.AssemblyLinearVelocity = Vector3.zero
-    mRoot.AssemblyAngularVelocity = Vector3.zero
-    
-    mRoot.CFrame = CFrame.new(targetPos)
-    
-    local rootPart = mRoot.Parent:FindFirstChild("RootPart")
-    if rootPart and rootPart ~= mRoot then
-        rootPart.AssemblyLinearVelocity = Vector3.zero
-        rootPart.AssemblyAngularVelocity = Vector3.zero
-        rootPart.CFrame = CFrame.new(targetPos)
+    if activeMobs[mob] then
+        activeMobs[mob].targetPos = targetPos
+        return
     end
     
-    task.wait()
-    mRoot.AssemblyLinearVelocity = Vector3.zero
-    mRoot.AssemblyAngularVelocity = Vector3.zero
+    activeMobs[mob] = {
+        targetPos = targetPos,
+        connection = nil
+    }
+    
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not bringMobsEnabled or not mob or not mob.Parent then
+            if connection then connection:Disconnect() end
+            activeMobs[mob] = nil
+            return
+        end
+        
+        local mRoot = mob:FindFirstChild("HumanoidRootPart")
+        if not mRoot then
+            if connection then connection:Disconnect() end
+            activeMobs[mob] = nil
+            return
+        end
+        
+        local targetPos = activeMobs[mob].targetPos
+        if not targetPos then return end
+        
+        local currentPos = mRoot.Position
+        local dist = (currentPos - targetPos).Magnitude
+        
+        if dist > 0.5 then
+            local newPos = currentPos:Lerp(targetPos, bringLerpSpeed * task.wait())
+            mRoot.CFrame = CFrame.new(newPos)
+            mRoot.AssemblyLinearVelocity = Vector3.zero
+            mRoot.AssemblyAngularVelocity = Vector3.zero
+        else
+            mRoot.CFrame = CFrame.new(targetPos)
+            mRoot.AssemblyLinearVelocity = Vector3.zero
+            mRoot.AssemblyAngularVelocity = Vector3.zero
+            if connection then connection:Disconnect() end
+            activeMobs[mob] = nil
+        end
+    end)
+    
+    activeMobs[mob].connection = connection
 end
 
+local mobSpawnTimes = {}
+
 task.spawn(function()
-    local lastPullTimes = {}
-    
     while task.wait(0.1) do
         if bringMobsEnabled and character and character:FindFirstChild("HumanoidRootPart") then
             local root = character.HumanoidRootPart
@@ -1361,33 +1409,53 @@ task.spawn(function()
                 local mHum = mob:FindFirstChild("Humanoid")
                 
                 if mRoot and mHum and mHum.Health > 0 then
-                    local dist = (mRoot.Position - root.Position).Magnitude
+                    if not mobSpawnTimes[mob] then
+                        mobSpawnTimes[mob] = currentTime
+                    end
                     
-                    if dist <= bringRange then
-                        local isBoss = mob:GetAttribute("IsBoss") == true
+                    local spawnTime = mobSpawnTimes[mob]
+                    local mobAge = currentTime - spawnTime
+                    
+                    if mobAge >= 0.2 then
+                        local dist = (mRoot.Position - root.Position).Magnitude
                         
-                        if not isBoss or bringBossesEnabled then
-                            local targetPos = root.Position + (root.CFrame.LookVector * bringDistance)
+                        if dist <= bringRange then
+                            local isBoss = mob:GetAttribute("IsBoss") == true
                             
-                            local currentDistToTarget = (mRoot.Position - targetPos).Magnitude
-                            
-                            if currentDistToTarget > 3 then
-                                local lastPull = lastPullTimes[mob] or 0
-                                if currentTime - lastPull > 0.2 then
-                                    teleportMob(mRoot, targetPos)
-                                    lastPullTimes[mob] = currentTime
+                            if not isBoss or bringBossesEnabled then
+                                local targetPos = root.Position + (root.CFrame.LookVector * bringDistance)
+                                local currentDistToTarget = (mRoot.Position - targetPos).Magnitude
+                                
+                                if currentDistToTarget > 2 then
+                                    lerpMob(mob, targetPos)
                                 end
                             end
                         end
                     end
+                else
+                    if activeMobs[mob] then
+                        if activeMobs[mob].connection then
+                            activeMobs[mob].connection:Disconnect()
+                        end
+                        activeMobs[mob] = nil
+                    end
+                    mobSpawnTimes[mob] = nil
                 end
             end
             
-            for mob, time in pairs(lastPullTimes) do
+            for mob, time in pairs(mobSpawnTimes) do
                 if not mob or not mob.Parent then
-                    lastPullTimes[mob] = nil
+                    mobSpawnTimes[mob] = nil
                 end
             end
+        else
+            for mob, data in pairs(activeMobs) do
+                if data.connection then
+                    data.connection:Disconnect()
+                end
+            end
+            table.clear(activeMobs)
+            table.clear(mobSpawnTimes)
         end
     end
 end)
