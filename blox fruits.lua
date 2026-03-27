@@ -1345,6 +1345,9 @@ Options.BringLerpSpeed:OnChanged(function() bringLerpSpeed = Options.BringLerpSp
 local activeMobs = {}
 
 local function lerpMob(mob, targetPos)
+    local sethiddenproperty = sethiddenproperty or function(...) return ... end
+    pcall(sethiddenproperty, plr, "SimulationRadius", 1e3)
+
     local mRoot = mob:FindFirstChild("HumanoidRootPart")
     if not mRoot then return end
     
