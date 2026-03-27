@@ -1346,7 +1346,7 @@ local activeMobs = {}
 
 local function lerpMob(mob, targetPos)
     local sethiddenproperty = sethiddenproperty or function(...) return ... end
-    pcall(sethiddenproperty, plr, "SimulationRadius", 1e3)
+    pcall(sethiddenproperty, plr, "SimulationRadius", math.huge)
 
     local mRoot = mob:FindFirstChild("HumanoidRootPart")
     if not mRoot then return end
