@@ -291,7 +291,7 @@ local function isSword(name)
     return false
 end
 
--- // ============================================================== Feature Variables ============================================================== \\ --
+-- // ============================================================== Cheets Variables ============================================================== \\ --
 
 local KillAura = { enabled = false, range = 50, speed = 20, switchDelay = 0, targetTypes = {}, circleEnabled = false, spoofWeaponEnabled = false, spoofWeaponType = "Melee", currentTargetIndex = 1, instaKillMode = false }
 local Aimbot = { enabled = false, fov = 150, targetType = "Mobs", currentTarget = nil, highlightEnabled = false, highlight = nil }
@@ -1812,8 +1812,10 @@ end)
 local FruitSkinsBox = Tabs.Visuals:AddLeftGroupbox('Fruit Skins')
 local kitsuneColorEnabled = false
 local portalColorEnabled = false
+local diamondColorEnabled = false
 local originalKitsuneColor = nil
 local originalPortalColors = {}
+local originalDiamondColors = {}
 
 FruitSkinsBox:AddToggle('KitsuneColor', {
     Text = 'Kitsune Color',
@@ -1842,6 +1844,20 @@ PortalDepbox:AddLabel('Color'):AddColorPicker('PortalColorPicker', {
     Transparency = 0,
 })
 PortalDepbox:SetupDependencies({ {Toggles.PortalColor, true} })
+
+FruitSkinsBox:AddToggle('DiamondColor', {
+    Text = 'Diamond Color',
+    Default = false,
+    Tooltip = "Changes the Diamond Fruit's Color",
+})
+
+local DiamondDepbox = FruitSkinsBox:AddDependencyBox()
+DiamondDepbox:AddLabel('Color'):AddColorPicker('DiamondColorPicker', {
+    Default = Color3.fromRGB(255, 200, 0),
+    Title = 'Diamond Color',
+    Transparency = 0,
+})
+DiamondDepbox:SetupDependencies({ {Toggles.DiamondColor, true} })
 
 task.spawn(function()
     while true do
@@ -1888,6 +1904,39 @@ task.spawn(function()
                     for i = 1, 7 do
                         if originalPortalColors[i] then
                             shifted:SetAttribute("Shifted_Color" .. i, originalPortalColors[i])
+                        end
+                    end
+                end
+            end
+        end
+        
+        local diamondEnabled = Toggles.DiamondColor.Value
+        local diamondFolder = plr:FindFirstChild("DiamondFruitVFXColor")
+        
+        if diamondFolder then
+            local shifted = diamondFolder:FindFirstChild("Shifted")
+            
+            if shifted then
+                if diamondEnabled then
+                    for i = 1, 3 do
+                        if originalDiamondColors[i] == nil then
+                            originalDiamondColors[i] = shifted:GetAttribute("Shifted_Color" .. i)
+                        end
+                    end
+                    
+                    local selectedColor = Options.DiamondColorPicker.Value
+                    shifted:SetAttribute("Shifted_Color1", selectedColor)
+                    
+                    local h, s, v = Color3.toHSV(selectedColor)
+                    local brightColor80 = Color3.fromHSV(h, s, math.min(1, v * 1.5))
+                    local brightColor40 = Color3.fromHSV(h, s, math.min(1, v * 1.2))
+                    
+                    shifted:SetAttribute("Shifted_Color2", brightColor80)
+                    shifted:SetAttribute("Shifted_Color3", brightColor40)
+                else
+                    for i = 1, 3 do
+                        if originalDiamondColors[i] then
+                            shifted:SetAttribute("Shifted_Color" .. i, originalDiamondColors[i])
                         end
                     end
                 end
