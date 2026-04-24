@@ -1813,9 +1813,11 @@ local FruitSkinsBox = Tabs.Visuals:AddLeftGroupbox('Fruit Skins')
 local kitsuneColorEnabled = false
 local portalColorEnabled = false
 local diamondColorEnabled = false
+local rumbleColorEnabled = false
 local originalKitsuneColor = nil
 local originalPortalColors = {}
 local originalDiamondColors = {}
+local originalRumbleColors = {}
 
 FruitSkinsBox:AddToggle('KitsuneColor', {
     Text = 'Kitsune Color',
@@ -1858,6 +1860,20 @@ DiamondDepbox:AddLabel('Color'):AddColorPicker('DiamondColorPicker', {
     Transparency = 0,
 })
 DiamondDepbox:SetupDependencies({ {Toggles.DiamondColor, true} })
+
+FruitSkinsBox:AddToggle('RumbleColor', {
+    Text = 'Rumble Color',
+    Default = false,
+    Tooltip = "Changes the Rumble Fruit's Color",
+})
+
+local RumbleDepbox = FruitSkinsBox:AddDependencyBox()
+RumbleDepbox:AddLabel('Color'):AddColorPicker('RumbleColorPicker', {
+	Default = Color3.fromRGB(111, 0, 255),
+	Title = 'Rumble Color',
+	Transparency = 0,
+})
+RumbleDepbox:SetupDependencies({ {Toggles.RumbleColor, true} })
 
 task.spawn(function()
     while true do
@@ -1928,15 +1944,48 @@ task.spawn(function()
                     shifted:SetAttribute("Shifted_Color1", selectedColor)
                     
                     local h, s, v = Color3.toHSV(selectedColor)
-                    local brightColor80 = Color3.fromHSV(h, s, math.min(1, v * 1.5))
-                    local brightColor40 = Color3.fromHSV(h, s, math.min(1, v * 1.2))
+                    local bright = Color3.fromHSV(h, s, math.min(1, v * 1.5))
+                    local bright2 = Color3.fromHSV(h, s, math.min(1, v * 1.2))
                     
-                    shifted:SetAttribute("Shifted_Color2", brightColor80)
-                    shifted:SetAttribute("Shifted_Color3", brightColor40)
+                    shifted:SetAttribute("Shifted_Color2", bright)
+                    shifted:SetAttribute("Shifted_Color3", bright2)
                 else
                     for i = 1, 3 do
                         if originalDiamondColors[i] then
                             shifted:SetAttribute("Shifted_Color" .. i, originalDiamondColors[i])
+                        end
+                    end
+                end
+            end
+        end
+		
+		local rumbleEnabled = Toggles.RumbleColor.Value
+        local rumbleFolder = plr:FindFirstChild("LightningFruitVFXColor")
+        
+        if rumbleFolder then
+            local shifted = rumbleFolder:FindFirstChild("Shifted")
+            
+            if shifted then
+                if rumbleEnabled then
+                    for i = 1, 3 do
+                        if originalRumbleColors[i] == nil then
+                            originalRumbleColors[i] = shifted:GetAttribute("Shifted_Color" .. i)
+                        end
+                    end
+                    
+                    local selectedColor = Options.RumbleColorPicker.Value
+                    shifted:SetAttribute("Shifted_Color1", selectedColor)
+                    
+                    local h, s, v = Color3.toHSV(selectedColor)
+                    local dark = Color3.fromHSV(h, s, math.min(1, v * 0.95))
+                    local dark2 = Color3.fromHSV(h, s, math.min(1, v * 0.8))
+                    
+                    shifted:SetAttribute("Shifted_Color2", dark)
+                    shifted:SetAttribute("Shifted_Color3", dark2)
+                else
+                    for i = 1, 3 do
+                        if originalRumbleColors[i] then
+                            shifted:SetAttribute("Shifted_Color" .. i, originalRumbleColors[i])
                         end
                     end
                 end
