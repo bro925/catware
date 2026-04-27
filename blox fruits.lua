@@ -169,6 +169,8 @@ local getServers
 
 -- // ============================================================== Helpers ============================================================== \\ --
 local partCache = setmetatable({}, {__mode = "v"})
+local sethiddenproperty = sethiddenproperty or function(...) return ... end
+sethiddenproperty(plr, "SimulationRadius", math.huge)
 
 local function getTargetPart(model)
     if partCache[model] and partCache[model].Parent then 
@@ -293,7 +295,7 @@ end
 
 -- // ============================================================== Cheets Variables ============================================================== \\ --
 
-local KillAura = { enabled = false, range = 50, speed = 20, switchDelay = 0, targetTypes = {}, circleEnabled = false, spoofWeaponEnabled = false, spoofWeaponType = "Melee", currentTargetIndex = 1, instaKillMode = false }
+local KillAura = { enabled = false, range = 60, speed = 20, switchDelay = 0, targetTypes = {}, circleEnabled = false, spoofWeaponEnabled = false, spoofWeaponType = "Melee", currentTargetIndex = 1, instaKillMode = false }
 local Aimbot = { enabled = false, fov = 150, targetType = "Mobs", currentTarget = nil, highlightEnabled = false, highlight = nil }
 local FastAttack = { enabled = false, connection = nil, attackDistance = 10, oldAttackSpeed = 1 }
 local NoFruitM1 = { enabled = false, connection = nil, defaultSpeed = 0 }
@@ -303,7 +305,7 @@ local ChestFarm = { enabled = false, horizontalSpeed = 200, boostEnabled = false
 local Dealer = { enabled = false, spawned = false, position = nil, DEFAULT_POS = Vector3.new(0, -1000, 0) }
 local NoSoru = { enabled = false, connection = nil, defaultCooldown = 0 }
 local ChestRange = { enabled = false, originalSizes = {} }
-local BringMobs = { enabled = false, bossesEnabled = false, range = 300, distance = 6 }
+local BringMobs = { enabled = false, bossesEnabled = false, range = 300, distance = 40, breakEnabled = true }
 local Camera = { enabled = false, x = 0, y = 0, z = 0, fov = 70 }
 local KitsuneColor = { enabled = false }
 local Dash = { enabled = false, speed = 100 }
@@ -1212,7 +1214,6 @@ local function freezePlayer(freeze)
     if freeze then
         if humanoid then
             humanoid.PlatformStand = true
-            humanoid.AutoRotate = false
         end
         if hrp then
             hrp.AssemblyLinearVelocity = Vector3.zero
@@ -1242,18 +1243,6 @@ local function freezePlayer(freeze)
     end
 end
 
-local function flick()
-    local hrp = character and character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    local currentPos = hrp.Position
-    local randomX = math.rad(math.random(-180, 180))
-    local randomY = math.rad(math.random(-180, 180))
-    local randomZ = math.rad(math.random(-180, 180))
-    
-    hrp.CFrame = CFrame.new(currentPos) * CFrame.fromEulerAnglesXYZ(randomX, randomY, randomZ)
-end
-
 ChestFarmBox:AddToggle('ChestFarmEnabled', {
     Text = 'Enabled',
     Default = false,
@@ -1271,7 +1260,6 @@ Toggles.ChestFarmEnabled:OnChanged(function()
     if ChestFarm.enabled then
         ChestFarm.chestHistory = {}
         ChestFarm.lastRecheck = tick()
-        ChestFarm.lastFlicker = tick()
         ChestFarm.lastCleanup = tick()
         ChestFarm.lastTeamSwitch = tick()
         ChestFarm.chestAttemptStartTime = {}
@@ -1279,26 +1267,11 @@ Toggles.ChestFarmEnabled:OnChanged(function()
         task.spawn(function()
             loadChests()
             freezePlayer(true)
-            task.wait(0.1)
-            
-            task.spawn(function()
-                while ChestFarm.enabled do
-                    if ChestFarm.currentTarget and isChestCollectable(ChestFarm.currentTarget) then
-                        fireTouchInterest(ChestFarm.currentTarget)
-                    end
-                    task.wait(0.01)
-                end
-            end)
             
             while ChestFarm.enabled do
                 if not character or not character.Parent then
-                    task.wait(0.5)
+                    task.wait(0.1)
                 else
-                    if tick() - ChestFarm.lastFlicker >= 0.01 then
-                        flick()
-                        ChestFarm.lastFlicker = tick()
-                    end
-                    
                     if tick() - ChestFarm.lastTeamSwitch >= 5 then
                         local currentTeam = plr.Team
                         local newTeam = (currentTeam and currentTeam.Name == "Marines") and "Pirates" or "Marines"
@@ -1306,7 +1279,7 @@ Toggles.ChestFarmEnabled:OnChanged(function()
                         ChestFarm.lastTeamSwitch = tick()
                     end
                     
-                    if tick() - ChestFarm.lastRecheck >= 8 then
+                    if tick() - ChestFarm.lastRecheck >= 6 then
                         for chest, timestamp in pairs(ChestFarm.chestHistory) do
                             if chest and chest.Parent and isChestCollectable(chest) then
                                 local touchTransmitters = 0
@@ -1339,38 +1312,7 @@ Toggles.ChestFarmEnabled:OnChanged(function()
                         ChestFarm.currentTarget = nil
                         task.wait(1)
                     else
-                        if ChestFarm.currentTarget and isChestCollectable(ChestFarm.currentTarget) then
-                            if not ChestFarm.chestAttemptStartTime[ChestFarm.currentTarget] then
-                                ChestFarm.chestAttemptStartTime[ChestFarm.currentTarget] = tick()
-                            end
-                            
-                            local attemptDuration = tick() - ChestFarm.chestAttemptStartTime[ChestFarm.currentTarget]
-                            if attemptDuration >= 7 then
-                                ChestFarm.currentTarget:Destroy()
-                                ChestFarm.chestAttemptStartTime[ChestFarm.currentTarget] = nil
-                                ChestFarm.currentTarget = nil
-                            else
-                                local hrp = character.HumanoidRootPart
-                                local chestPos = ChestFarm.currentTarget.Position
-                                local targetPos = Vector3.new(chestPos.X, chestPos.Y + 4, chestPos.Z)
-                                hrp.CFrame = CFrame.new(targetPos) * (hrp.CFrame - hrp.Position)
-                                
-                                fireTouchInterest(ChestFarm.currentTarget)
-                                
-                                local currentTransmitterCount = 0
-                                for _, child in ipairs(ChestFarm.currentTarget:GetChildren()) do
-                                    if child:IsA("TouchTransmitter") then
-                                        currentTransmitterCount = currentTransmitterCount + 1
-                                    end
-                                end
-                                
-                                if currentTransmitterCount == 0 then
-                                    ChestFarm.chestHistory[ChestFarm.currentTarget] = tick()
-                                    ChestFarm.chestAttemptStartTime[ChestFarm.currentTarget] = nil
-                                    ChestFarm.currentTarget = nil
-                                end
-                            end
-                        else
+                        if not ChestFarm.currentTarget or not isChestCollectable(ChestFarm.currentTarget) then
                             local nearest, nearestDist = nil, math.huge
                             local hrp = character.HumanoidRootPart
                             for _, chestPart in ipairs(collectableChests) do
@@ -1396,6 +1338,18 @@ Toggles.ChestFarmEnabled:OnChanged(function()
                             
                             if needsTeleport then
                                 zoneShit(chestZone)
+                            else
+                                local hrp = character.HumanoidRootPart
+                                local chestPos = ChestFarm.currentTarget.Position
+                                local targetPos = Vector3.new(chestPos.X, chestPos.Y, chestPos.Z)
+                                hrp.CFrame = CFrame.new(targetPos) * (hrp.CFrame - hrp.Position)
+
+                                for i = 1, 300 do
+                                    fireTouchInterest(ChestFarm.currentTarget)
+                                end
+                                
+                                ChestFarm.chestHistory[ChestFarm.currentTarget] = tick()
+                                ChestFarm.currentTarget = nil
                             end
                         end
                     end
@@ -1407,7 +1361,6 @@ Toggles.ChestFarmEnabled:OnChanged(function()
         ChestFarm.currentTarget = nil
         ChestFarm.chestHistory = nil
         ChestFarm.lastRecheck = nil
-        ChestFarm.lastFlicker = nil
         ChestFarm.lastCleanup = nil
         ChestFarm.lastTeamSwitch = nil
         ChestFarm.chestAttemptStartTime = nil
@@ -1438,7 +1391,6 @@ plr.CharacterAdded:Connect(function(newChar)
             hum = character:FindFirstChild("Humanoid")
         end
         
-        task.wait(0.5)
         Toggles.ChestFarmEnabled:SetValue(true)
     end
 end)
@@ -1595,18 +1547,24 @@ BringMobsBox:AddSlider('BringDistance', {
     Text = 'Bring Distance',
     Default = 6,
     Min = -20,
-    Max = 20,
+    Max = 60,
     Rounding = 1,
     Suffix = ' studs',
+})
+
+BringMobsBox:AddToggle('BreakMobs', {
+    Text = 'Break Mobs',
+    Default = false,
+    Tooltip = "Breaks the mobs by removing their humanoid.",
 })
 
 Toggles.BringMobs:OnChanged(function() BringMobs.enabled = Toggles.BringMobs.Value end)
 Toggles.BringBosses:OnChanged(function() BringMobs.bossesEnabled = Toggles.BringBosses.Value end)
 Options.BringDistance:OnChanged(function() BringMobs.distance = Options.BringDistance.Value end)
 Options.BringRange:OnChanged(function() BringMobs.range = Options.BringRange.Value end)
+Toggles.BreakMobs:OnChanged(function() BringMobs.breakEnabled = Toggles.BreakMobs.Value end)
 
 local activeMobs = {}
-local sethiddenproperty = sethiddenproperty or function(...) return ... end
 
 task.spawn(function()
     while task.wait() do
@@ -1617,12 +1575,10 @@ task.spawn(function()
             if enemies then
                 for _, mob in pairs(enemies:GetChildren()) do
                     pcall(function()
-                        sethiddenproperty(plr, "SimulationRadius", math.huge)
-
                         local mRoot = mob:FindFirstChild("HumanoidRootPart")
                         local mHum = mob:FindFirstChild("Humanoid")
                         
-                        if mRoot and mHum and mHum.Health > 0 then
+                        if mRoot and (BringMobs.breakEnabled or (mHum and mHum.Health > 0)) then
                             local distToPlayer = (mRoot.Position - root.Position).Magnitude
                             
                             if distToPlayer <= BringMobs.range then
@@ -1631,11 +1587,13 @@ task.spawn(function()
                                 if not isBoss or BringMobs.bossesEnabled then
                                     local targetPos = root.Position + (root.CFrame.LookVector * BringMobs.distance)
                                     
-                                    if distToPlayer <= math.abs(BringMobs.range) then 
-                                        mRoot.CFrame = CFrame.new(targetPos)
-                                        mRoot.AssemblyLinearVelocity = Vector3.zero
-                                        mRoot.AssemblyAngularVelocity = Vector3.zero
+                                    if BringMobs.breakEnabled and mHum then
+                                        mHum:Destroy()
                                     end
+                                    
+                                    mRoot.CFrame = CFrame.new(targetPos)
+                                    mRoot.AssemblyLinearVelocity = Vector3.zero
+                                    mRoot.AssemblyAngularVelocity = Vector3.zero
                                 end
                             end
                         end
@@ -1643,6 +1601,7 @@ task.spawn(function()
                 end
             end
         end
+        task.wait()
     end
 end)
 
